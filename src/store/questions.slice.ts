@@ -81,6 +81,7 @@ const initialState = {
       { id: 3, content: "", isCorrect: false },
       { id: 4, content: "", isCorrect: false },
     ],
+    shortAnswers: [],
     explanation: "",
   },
   subtopicsToLink: [] as string[],

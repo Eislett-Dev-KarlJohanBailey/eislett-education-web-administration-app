@@ -479,6 +479,7 @@ export default function QuestionsPage() {
           { label: "All Types", value: undefined },
           { label: "Multiple Choice", value: QuestionType.MULTIPLE_CHOICE },
           { label: "True/False", value: QuestionType.TRUE_FALSE },
+          { label: "Short Answer", value: QuestionType.SHORT_ANSWER },
         ],
       },
     ],
@@ -512,19 +513,26 @@ export default function QuestionsPage() {
       {
         id: "type",
         header: "Type",
-        cell: (question: QuestionDetails) => (
-          <Badge
-            variant={
-              question.type === QuestionType.MULTIPLE_CHOICE
-                ? "default"
-                : "secondary"
-            }
-          >
-            {question.type === QuestionType.MULTIPLE_CHOICE
-              ? "Multiple Choice"
-              : "True/False"}
-          </Badge>
-        ),
+        cell: (question: QuestionDetails) => {
+          const getTypeLabel = () => {
+            if (question.type === QuestionType.MULTIPLE_CHOICE) return "Multiple Choice";
+            if (question.type === QuestionType.TRUE_FALSE) return "True/False";
+            if (question.type === QuestionType.SHORT_ANSWER) return "Short Answer";
+            return "Unknown";
+          };
+          
+          const getVariant = () => {
+            if (question.type === QuestionType.MULTIPLE_CHOICE) return "default";
+            if (question.type === QuestionType.SHORT_ANSWER) return "outline";
+            return "secondary";
+          };
+          
+          return (
+            <Badge variant={getVariant()}>
+              {getTypeLabel()}
+            </Badge>
+          );
+        },
         sortable: true,
       },
       {

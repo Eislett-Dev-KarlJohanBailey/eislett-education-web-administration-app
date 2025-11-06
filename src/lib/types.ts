@@ -1,6 +1,7 @@
 export enum QuestionType {
   MULTIPLE_CHOICE = "multiple_choice",
   TRUE_FALSE = "true_or_false",
+  SHORT_ANSWER = "short_answer",
 }
 
 export interface Question {
@@ -23,6 +24,12 @@ export interface QuestionOption {
   isCorrect: boolean;
 }
 
+export interface SimpleShortAnswersOption {
+  content: string;
+  marks: number;
+  explanation?: string;
+}
+
 export interface QuestionFormData {
   id?: number;
   title: string;
@@ -34,5 +41,6 @@ export interface QuestionFormData {
   difficultyLevel: number;
   // subtopicId: string
   multipleChoiceOptions: QuestionOption[];
+  shortAnswers?: SimpleShortAnswersOption[];
   explanation: string;
 }

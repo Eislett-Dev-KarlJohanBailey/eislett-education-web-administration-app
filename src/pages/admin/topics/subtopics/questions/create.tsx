@@ -169,6 +169,7 @@ export default function CreateQuestionPage() {
   const handleTypeChange = useCallback(
     (type: QuestionType) => {
       let newOptions = formData.multipleChoiceOptions;
+      let newShortAnswers = formData.shortAnswers || [];
 
       if (type === QuestionType.TRUE_FALSE) {
         newOptions = [
@@ -185,13 +186,12 @@ export default function CreateQuestionPage() {
           { id: 3, content: "", isCorrect: false },
           { id: 4, content: "", isCorrect: false },
         ];
+      } else if (type === QuestionType.SHORT_ANSWER && newShortAnswers.length === 0) {
+        newShortAnswers = [
+          { content: "", marks: 1, explanation: "" },
+        ];
       }
 
-      // setFormData(prev => ({
-      //   ...prev,
-      //   type,
-      //   multipleChoiceOptions: newOptions
-      // }))
       dispatch(setQuestionFormData({ field: "type", value: type }));
       dispatch(
         setQuestionFormData({
@@ -199,8 +199,16 @@ export default function CreateQuestionPage() {
           value: newOptions,
         })
       );
+      if (type === QuestionType.SHORT_ANSWER) {
+        dispatch(
+          setQuestionFormData({
+            field: "shortAnswers",
+            value: newShortAnswers,
+          })
+        );
+      }
     },
-    [dispatch, formData.multipleChoiceOptions]
+    [dispatch, formData.multipleChoiceOptions, formData.shortAnswers]
   );
 
   // Handle option content change
@@ -318,6 +326,60 @@ export default function CreateQuestionPage() {
       }
     },
     [dispatch, formData.multipleChoiceOptions, formData.type]
+  );
+
+  // Handle short answer change
+  const handleShortAnswerChange = useCallback(
+    (index: number, field: 'content' | 'marks' | 'explanation', value: string | number) => {
+      const newShortAnswers = [...(formData.shortAnswers || [])];
+      newShortAnswers[index] = {
+        ...newShortAnswers[index],
+        [field]: value,
+      };
+      dispatch(
+        setQuestionFormData({
+          field: "shortAnswers",
+          value: newShortAnswers,
+        })
+      );
+    },
+    [dispatch, formData.shortAnswers]
+  );
+
+  // Add a new short answer option
+  const handleAddShortAnswer = useCallback(() => {
+    if (formData.type === QuestionType.SHORT_ANSWER) {
+      const newShortAnswers = [
+        ...(formData.shortAnswers || []),
+        { content: "", marks: 1, explanation: "" },
+      ];
+      dispatch(
+        setQuestionFormData({
+          field: "shortAnswers",
+          value: newShortAnswers,
+        })
+      );
+    }
+  }, [dispatch, formData.shortAnswers, formData.type]);
+
+  // Remove a short answer option
+  const handleRemoveShortAnswer = useCallback(
+    (index: number) => {
+      if (
+        formData.type === QuestionType.SHORT_ANSWER &&
+        formData.shortAnswers &&
+        formData.shortAnswers.length > 1
+      ) {
+        const newShortAnswers = formData.shortAnswers.filter((_, i) => i !== index);
+        dispatch(
+          setQuestionFormData({
+            field: "shortAnswers",
+            value: newShortAnswers,
+          })
+        );
+      }
+    },
+    [dispatch, formData.shortAnswers, formData.type]
   );
 
   // Handle tags
@@ -481,8 +543,11 @@ export default function CreateQuestionPage() {
         return;
       }
 
-      // Check if at least one option is marked as correct
-      if (!formData.multipleChoiceOptions.some((option) => option.isCorrect)) {
+      // Check if at least one option is marked as correct (for multiple choice)
+      if (
+        formData.type === QuestionType.MULTIPLE_CHOICE &&
+        !formData.multipleChoiceOptions.some((option) => option.isCorrect)
+      ) {
         // alert("Please mark at least one option as correct")
         displayErrorMessage(
           "Missing required fields",
@@ -491,14 +556,39 @@ export default function CreateQuestionPage() {
         return;
       }
 
-      // Check if all options have content
+      // Check if all options have content (for multiple choice)
       if (
+        formData.type === QuestionType.MULTIPLE_CHOICE &&
         formData.multipleChoiceOptions.some((option) => !option.content.trim())
       ) {
         // alert("Please fill in all options")
         displayErrorMessage(
           "Missing required fields",
           "Please fill in all options"
+        );
+        return;
+      }
+
+      // Check if short answers are provided (for short answer)
+      if (
+        formData.type === QuestionType.SHORT_ANSWER &&
+        (!formData.shortAnswers || formData.shortAnswers.length === 0)
+      ) {
+        displayErrorMessage(
+          "Missing required fields",
+          "Please add at least one short answer option"
+        );
+        return;
+      }
+
+      // Check if all short answers have content
+      if (
+        formData.type === QuestionType.SHORT_ANSWER &&
+        formData.shortAnswers?.some((answer) => !answer.content.trim())
+      ) {
+        displayErrorMessage(
+          "Missing required fields",
+          "Please fill in all short answer contents"
         );
         return;
       }
@@ -516,11 +606,12 @@ export default function CreateQuestionPage() {
 
       try {
         const isTrue =
-          formData?.type === QuestionType.MULTIPLE_CHOICE
+          formData?.type === QuestionType.MULTIPLE_CHOICE ||
+          formData?.type === QuestionType.SHORT_ANSWER
             ? undefined
             : formData?.multipleChoiceOptions.find(
                 (el) => el?.content?.toLowerCase() === "true"
-              ).isCorrect;
+              )?.isCorrect;
 
         let params = {
           title: formData?.title,
@@ -533,6 +624,10 @@ export default function CreateQuestionPage() {
           multipleChoiceOptions:
             formData?.type === QuestionType.MULTIPLE_CHOICE
               ? formData?.multipleChoiceOptions
+              : null,
+          shortAnswers:
+            formData?.type === QuestionType.SHORT_ANSWER
+              ? formData?.shortAnswers
               : null,
           isTrue: isTrue,
           explanation: formData?.explanation,
@@ -704,8 +799,9 @@ export default function CreateQuestionPage() {
                       <SelectValue placeholder="Select question type" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value={QuestionType.MULTIPLE_CHOICE}>Multiple Choice</SelectItem>
-                      <SelectItem value={QuestionType.TRUE_FALSE}>True/False</SelectItem>
+                    <SelectItem value={QuestionType.MULTIPLE_CHOICE}>Multiple Choice</SelectItem>
+                    <SelectItem value={QuestionType.TRUE_FALSE}>True/False</SelectItem>
+                    <SelectItem value={QuestionType.SHORT_ANSWER}>Short Answer</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -729,6 +825,9 @@ export default function CreateQuestionPage() {
                     </SelectItem>
                     <SelectItem value={QuestionType.TRUE_FALSE}>
                       True/False
+                    </SelectItem>
+                    <SelectItem value={QuestionType.SHORT_ANSWER}>
+                      Short Answer
                     </SelectItem>
                   </SelectContent>
                 </Select>
@@ -892,7 +991,9 @@ export default function CreateQuestionPage() {
               <CardDescription>
                 {formData.type === QuestionType.MULTIPLE_CHOICE
                   ? "Add multiple choice options and mark the correct answer"
-                  : "Select the correct answer for this true/false question"}
+                  : formData.type === QuestionType.TRUE_FALSE
+                  ? "Select the correct answer for this true/false question"
+                  : "Add short answer options with content, marks, and optional explanations"}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -952,7 +1053,7 @@ export default function CreateQuestionPage() {
                     Add Option
                   </Button>
                 </div>
-              ) : (
+              ) : formData.type === QuestionType.TRUE_FALSE ? (
                 <div className="space-y-4">
                   {formData.multipleChoiceOptions.map((option) => (
                     <div
@@ -976,6 +1077,95 @@ export default function CreateQuestionPage() {
                       </div>
                     </div>
                   ))}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {(formData.shortAnswers || []).map((answer, index) => (
+                    <div
+                      key={index}
+                      className="p-4 border rounded-lg space-y-3"
+                    >
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm font-medium">
+                          Short Answer {index + 1}
+                        </Label>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRemoveShortAnswer(index)}
+                          disabled={(formData.shortAnswers || []).length <= 1}
+                        >
+                          <Trash className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor={`short-answer-content-${index}`}>
+                          Answer Content
+                        </Label>
+                        <Input
+                          id={`short-answer-content-${index}`}
+                          value={answer.content}
+                          onChange={(e) =>
+                            handleShortAnswerChange(
+                              index,
+                              "content",
+                              e.target.value
+                            )
+                          }
+                          placeholder="Enter the expected answer"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor={`short-answer-marks-${index}`}>
+                            Marks
+                          </Label>
+                          <Input
+                            id={`short-answer-marks-${index}`}
+                            type="number"
+                            min="0"
+                            value={answer.marks}
+                            onChange={(e) =>
+                              handleShortAnswerChange(
+                                index,
+                                "marks",
+                                parseInt(e.target.value) || 0
+                              )
+                            }
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor={`short-answer-explanation-${index}`}>
+                          Explanation (Optional)
+                        </Label>
+                        <Textarea
+                          id={`short-answer-explanation-${index}`}
+                          value={answer.explanation || ""}
+                          onChange={(e) =>
+                            handleShortAnswerChange(
+                              index,
+                              "explanation",
+                              e.target.value
+                            )
+                          }
+                          placeholder="Enter explanation for this answer"
+                          rows={2}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-2"
+                    onClick={handleAddShortAnswer}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Short Answer
+                  </Button>
                 </div>
               )}
             </CardContent>
@@ -1023,24 +1213,59 @@ export default function CreateQuestionPage() {
                     </div>
 
                     <div className="space-y-2">
-                      {formData.multipleChoiceOptions.map((option, index) => (
-                        <div
-                          key={option.id}
-                          className="flex items-center space-x-2"
-                        >
-                          {formData.type === QuestionType.MULTIPLE_CHOICE ? (
-                            <div className="flex items-center justify-center h-6 w-6 rounded-full bg-muted text-sm font-medium">
-                              {String.fromCharCode(65 + index)}
+                      {formData.type === QuestionType.SHORT_ANSWER ? (
+                        (formData.shortAnswers || []).map((answer, index) => (
+                          <div
+                            key={index}
+                            className="p-3 border rounded-md space-y-2"
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium">
+                                Answer {index + 1}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {answer.marks} mark{answer.marks !== 1 ? 's' : ''}
+                              </span>
                             </div>
-                          ) : null}
-                          <MarkdownRenderer
-                            content={
-                              option.content ||
-                              `Option ${index + 1} will appear here`
-                            }
-                          />
-                        </div>
-                      ))}
+                            <MarkdownRenderer
+                              content={
+                                answer.content ||
+                                `Short answer ${index + 1} will appear here`
+                              }
+                            />
+                            {answer.explanation && (
+                              <div className="mt-2 pt-2 border-t">
+                                <p className="text-xs text-muted-foreground font-medium mb-1">
+                                  Explanation:
+                                </p>
+                                <MarkdownRenderer
+                                  content={answer.explanation}
+                                  className="text-sm"
+                                />
+                              </div>
+                            )}
+                          </div>
+                        ))
+                      ) : (
+                        formData.multipleChoiceOptions.map((option, index) => (
+                          <div
+                            key={option.id}
+                            className="flex items-center space-x-2"
+                          >
+                            {formData.type === QuestionType.MULTIPLE_CHOICE ? (
+                              <div className="flex items-center justify-center h-6 w-6 rounded-full bg-muted text-sm font-medium">
+                                {String.fromCharCode(65 + index)}
+                              </div>
+                            ) : null}
+                            <MarkdownRenderer
+                              content={
+                                option.content ||
+                                `Option ${index + 1} will appear here`
+                              }
+                            />
+                          </div>
+                        ))
+                      )}
                     </div>
                   </div>
                 </TabsContent>

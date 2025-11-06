@@ -1,6 +1,7 @@
 import { QuestionOptionDetails } from "./questionOptionDetails";
 import { QuestionSubTopicDetails } from "./QuestionSubTopicDetails";
 import { QuestionTypes } from "./questionTypes";
+import { SimpleShortAnswersOption } from "@/lib/types";
 
 export interface QuestionDetails {
   id?: string;
@@ -15,5 +16,6 @@ export interface QuestionDetails {
   difficultyLevel: number;
   subTopics?: QuestionSubTopicDetails[];
   multipleChoiceOptions?: QuestionOptionDetails[];
+  shortAnswers?: SimpleShortAnswersOption[];
   explanation: string;
 }
