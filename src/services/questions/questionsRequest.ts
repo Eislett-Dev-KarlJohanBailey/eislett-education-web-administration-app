@@ -39,14 +39,14 @@ async function handleFetchQuestions(
   token: string,
   page_number: number,
   page_size: number,
-  title?: string,
+  name?: string,
   sub_topic_id?: string
 ): Promise<returnType> {
   try {
     const params: QuestionReqParams = {
       page_number,
       page_size,
-      title: title,
+      name: name,
       sub_topic_id: sub_topic_id,
     };
 

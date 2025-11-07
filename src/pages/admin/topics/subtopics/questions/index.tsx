@@ -180,12 +180,12 @@ export default function QuestionsPage() {
     if (!isNaN(pageFromUrl))
       dispatch(setQuestionReqParams({ page_number: pageFromUrl }));
 
-    const searchFromUrl = router.query.search as string;
-    // if (searchFromUrl) dispatch(setQuestionReqParams({ title: searchFromUrl }));
+    const nameFromUrl = router.query.name as string;
+    // if (nameFromUrl) dispatch(setQuestionReqParams({ name: nameFromUrl }));
 
     const reqParams = {
-      title:
-        searchFromUrl && searchFromUrl?.length > 0 ? searchFromUrl : undefined,
+      name:
+        nameFromUrl && nameFromUrl?.length > 0 ? nameFromUrl : undefined,
       page_number: !isNaN(pageFromUrl) ? pageFromUrl : undefined,
     };
     removeNulls(reqParams);
@@ -231,7 +231,7 @@ export default function QuestionsPage() {
         authContext?.token,
         questionReqParams?.page_number,
         questionReqParams?.page_size,
-        questionReqParams?.title,
+        questionReqParams?.name,
         questionReqParams?.sub_topic_id
       );
 
@@ -255,7 +255,7 @@ export default function QuestionsPage() {
   }, [
     questionReqParams?.page_number,
     questionReqParams?.page_size,
-    questionReqParams?.title,
+    questionReqParams?.name,
     questionReqParams?.sub_topic_id,
     dispatch,
     authContext?.token,
@@ -363,7 +363,18 @@ export default function QuestionsPage() {
   );
 
   const handleSearch = useDebouncedCallback((value: string) => {
-    dispatch(setQuestionReqParams({ title: value, page_number: 1 })); // triggers apply filter
+    dispatch(setQuestionReqParams({ name: value, page_number: 1 })); // triggers apply filter
+    
+    // update url
+    const query = {
+      ...router.query,
+      name: value || undefined,
+      page: "1",
+    };
+    if (!value) delete query.name;
+    router.push({ pathname: router.pathname, query }, undefined, {
+      shallow: true,
+    });
   }, 1000);
 
   const handleSubtopicFilterChange = useCallback(

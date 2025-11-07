@@ -13,7 +13,7 @@ interface QuestionReqParams {
   page_number: number;
   page_size: number;
   sub_topic_id: string | undefined;
-  title: string | undefined;
+  name: string | undefined;
 }
 
 interface FilterTypes {
@@ -49,7 +49,7 @@ const initialState = {
     page_number: 1,
     page_size: DEFAULT_PAGE_SIZE,
     sub_topic_id: undefined as string | undefined, // selected subtopic
-    title: undefined,
+    name: undefined,
   },
   totalQuestion: 0,
   filters: {
