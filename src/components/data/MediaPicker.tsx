@@ -241,7 +241,12 @@ export function MediaPicker({ onInsert, trigger }: MediaPickerProps) {
       formData.append("file", file);
       formData.append("name", lowerCaseName);
 
-      const response = await fetch("/api/upload", {
+      const serverBaseUrl = process.env.NEXT_PUBLIC_SERVER_BASE_URL;
+      if (!serverBaseUrl) {
+        throw new Error("Server base URL is not configured");
+      }
+
+      const response = await fetch(`${serverBaseUrl}upload`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -254,10 +259,33 @@ export function MediaPicker({ onInsert, trigger }: MediaPickerProps) {
         throw new Error(errorData.error || "Failed to upload file");
       }
 
-      toast({
-        title: "Upload successful",
-        description: "File uploaded successfully",
-      });
+      const uploadResponse = await response.json();
+      
+      // Get the uploaded file URL and name from response
+      // Response structure may vary, but typically contains url and name
+      const uploadedUrl = uploadResponse.url || uploadResponse.data?.url;
+      const uploadedName = uploadResponse.name || uploadResponse.data?.name || lowerCaseName;
+
+      if (uploadedUrl) {
+        // Generate markdown syntax
+        const markdown = `![${uploadedName}](${uploadedUrl} "${uploadedName}")`;
+        
+        // Copy to clipboard
+        navigator.clipboard.writeText(markdown).then(() => {
+          toast({
+            title: "Upload successful",
+            description: "File uploaded and markdown copied to clipboard",
+          });
+        });
+
+        // Insert into content area
+        onInsert(markdown);
+      } else {
+        toast({
+          title: "Upload successful",
+          description: "File uploaded successfully",
+        });
+      }
 
       // Reset form
       setUploadFileName("");
@@ -265,7 +293,10 @@ export function MediaPicker({ onInsert, trigger }: MediaPickerProps) {
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
+      
+      // Close both dialogs
       setUploadDialogOpen(false);
+      setOpen(false);
 
       // Refresh media list
       if (debouncedSearchQuery.trim()) {
