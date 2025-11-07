@@ -68,6 +68,7 @@ import {
   displayErrorMessage,
   displaySuccessMessage,
 } from "@/services/displayMessages";
+import { DeleteConfirmationDialog } from "@/components/data/DeleteConfirmationDialog";
 
 interface Subject {
   id: string;
@@ -98,6 +99,15 @@ export default function RoadmapsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
   const [expandedStrands, setExpandedStrands] = useState<Record<string, boolean>>({});
+  
+  // Delete confirmation states
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteType, setDeleteType] = useState<"strand" | "section" | "quiz" | null>(null);
+  const [deleteIndices, setDeleteIndices] = useState<{
+    strandIndex?: number;
+    sectionIndex?: number;
+    quizIndex?: number;
+  } | null>(null);
 
   // Dropdown data
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -379,6 +389,12 @@ export default function RoadmapsPage() {
     };
   };
 
+  const handleDeleteStrand = (index: number) => {
+    setDeleteType("strand");
+    setDeleteIndices({ strandIndex: index });
+    setDeleteDialogOpen(true);
+  };
+
   const removeStrand = (index: number) => {
     const newStrands = [...(formData.strands || [])];
     newStrands.splice(index, 1);
@@ -403,6 +419,12 @@ export default function RoadmapsPage() {
       },
     ];
     setFormData({ ...formData, strands: newStrands });
+  };
+
+  const handleDeleteSection = (strandIndex: number, sectionIndex: number) => {
+    setDeleteType("section");
+    setDeleteIndices({ strandIndex, sectionIndex });
+    setDeleteDialogOpen(true);
   };
 
   const removeSection = (strandIndex: number, sectionIndex: number) => {
@@ -441,6 +463,16 @@ export default function RoadmapsPage() {
     setFormData({ ...formData, strands: newStrands });
   };
 
+  const handleDeleteQuiz = (
+    strandIndex: number,
+    sectionIndex: number,
+    quizIndex: number
+  ) => {
+    setDeleteType("quiz");
+    setDeleteIndices({ strandIndex, sectionIndex, quizIndex });
+    setDeleteDialogOpen(true);
+  };
+
   const removeQuiz = (
     strandIndex: number,
     sectionIndex: number,
@@ -452,6 +484,64 @@ export default function RoadmapsPage() {
       1
     );
     setFormData({ ...formData, strands: newStrands });
+  };
+
+  const handleDeleteConfirm = () => {
+    if (!deleteType || !deleteIndices) return;
+
+    if (deleteType === "strand" && deleteIndices.strandIndex !== undefined) {
+      removeStrand(deleteIndices.strandIndex);
+    } else if (
+      deleteType === "section" &&
+      deleteIndices.strandIndex !== undefined &&
+      deleteIndices.sectionIndex !== undefined
+    ) {
+      removeSection(deleteIndices.strandIndex, deleteIndices.sectionIndex);
+    } else if (
+      deleteType === "quiz" &&
+      deleteIndices.strandIndex !== undefined &&
+      deleteIndices.sectionIndex !== undefined &&
+      deleteIndices.quizIndex !== undefined
+    ) {
+      removeQuiz(
+        deleteIndices.strandIndex,
+        deleteIndices.sectionIndex,
+        deleteIndices.quizIndex
+      );
+    }
+
+    setDeleteDialogOpen(false);
+    setDeleteType(null);
+    setDeleteIndices(null);
+  };
+
+  const getDeleteWarningMessage = () => {
+    let itemType = "";
+    if (deleteType === "strand") {
+      itemType = "strand";
+    } else if (deleteType === "section") {
+      itemType = "section";
+    } else if (deleteType === "quiz") {
+      itemType = "quiz";
+    }
+
+    return (
+      <div className="space-y-3">
+        <div className="font-semibold text-destructive">
+          ⚠️ WARNING: Deleting this {itemType} can significantly affect students' progress and learning experience.
+        </div>
+        <div>
+          Students who are currently working on this content may lose their progress or encounter errors. This action cannot be undone.
+        </div>
+        <div className="bg-muted p-3 rounded-md border-l-4 border-blue-500">
+          <div className="font-medium mb-1">💡 RECOMMENDATION:</div>
+          <div>Instead of deleting, consider editing the item inline to modify its content. This preserves student progress and maintains data integrity.</div>
+        </div>
+        <div className="font-medium">
+          Are you absolutely sure you want to delete this {itemType}?
+        </div>
+      </div>
+    );
   };
 
   const updateQuiz = (
@@ -895,7 +985,7 @@ export default function RoadmapsPage() {
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={() => removeStrand(strandIndex)}
+                                    onClick={() => handleDeleteStrand(strandIndex)}
                                   >
                                     <X className="h-4 w-4" />
                                   </Button>
@@ -984,7 +1074,7 @@ export default function RoadmapsPage() {
                                                     <Button
                                                       variant="ghost"
                                                       size="sm"
-                                                      onClick={() => removeSection(strandIndex, sectionIndex)}
+                                                      onClick={() => handleDeleteSection(strandIndex, sectionIndex)}
                                                     >
                                                       <X className="h-4 w-4" />
                                                     </Button>
@@ -1100,7 +1190,7 @@ export default function RoadmapsPage() {
                                                                     variant="ghost"
                                                                     size="sm"
                                                                     onClick={() =>
-                                                                      removeQuiz(strandIndex, sectionIndex, quizIndex)
+                                                                      handleDeleteQuiz(strandIndex, sectionIndex, quizIndex)
                                                                     }
                                                                   >
                                                                     <X className="h-4 w-4" />
@@ -1142,6 +1232,16 @@ export default function RoadmapsPage() {
           )}
         </TabsContent>
       </Tabs>
+
+      <DeleteConfirmationDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={handleDeleteConfirm}
+        title="⚠️ Serious Warning: Delete Roadmap Item"
+        description={getDeleteWarningMessage()}
+        cancelLabel="Cancel - Edit Instead"
+        confirmLabel="Yes, Delete Anyway"
+      />
     </AdminLayout>
   );
 }
