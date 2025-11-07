@@ -602,6 +602,79 @@ export default function RoadmapsPage() {
     }));
   };
 
+  // Searchable Topics Combobox Component
+  const TopicsCombobox = ({
+    strandIndex,
+    currentTopicId,
+  }: {
+    strandIndex: number;
+    currentTopicId: string;
+  }) => {
+    const [open, setOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState("");
+
+    // Filter topics case-insensitively
+    const filteredTopics = topics.filter((topic) =>
+      topic.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    const selectedTopic = topics.find((t) => t.id === currentTopicId);
+
+    return (
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className="w-[200px] justify-between"
+          >
+            <span className="truncate">
+              {selectedTopic ? selectedTopic.name : "Select topic..."}
+            </span>
+            <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[300px] p-0" align="start">
+          <Command shouldFilter={false}>
+            <CommandInput 
+              placeholder="Search topics..." 
+              value={searchQuery}
+              onValueChange={setSearchQuery}
+            />
+            <CommandList>
+              <CommandEmpty>No topics found.</CommandEmpty>
+              <CommandGroup>
+                {filteredTopics.map((topic) => {
+                  const isSelected = topic.id === currentTopicId;
+                  return (
+                    <CommandItem
+                      key={topic.id}
+                      value={topic.id}
+                      onSelect={() => {
+                        updateStrand(strandIndex, "topic", topic.id);
+                        setOpen(false);
+                        setSearchQuery("");
+                      }}
+                    >
+                      <Check
+                        className={cn(
+                          "mr-2 h-4 w-4",
+                          isSelected ? "opacity-100" : "opacity-0"
+                        )}
+                      />
+                      {topic.name}
+                    </CommandItem>
+                  );
+                })}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+    );
+  };
+
   // Searchable Subtopics Combobox Component
   const SubtopicsCombobox = ({
     strandIndex,
@@ -615,10 +688,16 @@ export default function RoadmapsPage() {
     selectedSubtopics: string[] | Array<{ id: string; name?: string }>;
   }) => {
     const [open, setOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState("");
     // Normalize selectedSubtopics to array of string IDs
     const selectedIds = selectedSubtopics.map((st: any) => 
       typeof st === "string" ? st : st?.id || ""
     ).filter(Boolean);
+
+    // Filter subtopics case-insensitively
+    const filteredSubtopics = subtopics.filter((subtopic) =>
+      subtopic.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
     return (
       <Popover open={open} onOpenChange={setOpen}>
@@ -638,12 +717,16 @@ export default function RoadmapsPage() {
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-[300px] p-0" align="start">
-          <Command>
-            <CommandInput placeholder="Search subtopics..." />
+          <Command shouldFilter={false}>
+            <CommandInput 
+              placeholder="Search subtopics..." 
+              value={searchQuery}
+              onValueChange={setSearchQuery}
+            />
             <CommandList>
               <CommandEmpty>No subtopics found.</CommandEmpty>
               <CommandGroup>
-                {subtopics.map((subtopic) => {
+                {filteredSubtopics.map((subtopic) => {
                   const isSelected = selectedIds.includes(subtopic.id);
                   return (
                     <CommandItem
@@ -923,25 +1006,12 @@ export default function RoadmapsPage() {
                                   </Button>
                                 </TableCell>
                                 <TableCell>
-                                  <Select
-                                    value={typeof strand.topic === "string" 
+                                  <TopicsCombobox
+                                    strandIndex={strandIndex}
+                                    currentTopicId={typeof strand.topic === "string" 
                                       ? strand.topic 
                                       : (strand.topic as any)?.id || ""}
-                                    onValueChange={(value) =>
-                                      updateStrand(strandIndex, "topic", value)
-                                    }
-                                  >
-                                    <SelectTrigger className="w-[200px]">
-                                      <SelectValue placeholder="Select topic" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {topics.map((topic) => (
-                                        <SelectItem key={topic.id} value={topic.id}>
-                                          {topic.name}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
+                                  />
                                 </TableCell>
                                 <TableCell>
                                   <Input
