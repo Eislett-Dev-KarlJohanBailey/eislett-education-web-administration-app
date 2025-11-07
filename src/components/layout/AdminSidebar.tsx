@@ -16,7 +16,8 @@ import {
   Building,
   BookText,
   FileQuestion,
-  ChevronDown
+  ChevronDown,
+  Map
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
@@ -56,6 +57,11 @@ export function AdminSidebar({ isOpen, onOpenChange }: AdminSidebarProps) {
       title: "Courses",
       icon: BookText,
       href: "/admin/courses"
+    },
+    {
+      title: "Roadmaps",
+      icon: Map,
+      href: "/admin/roadmaps"
     },
     {
       title: "Topics",
