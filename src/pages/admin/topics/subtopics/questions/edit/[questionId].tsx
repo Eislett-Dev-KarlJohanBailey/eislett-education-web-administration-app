@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useContext } from "react";
+import { useState, useEffect, useCallback, useContext, useRef } from "react";
 import { useRouter } from "next/router";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { Button } from "@/components/ui/button";
@@ -49,6 +49,7 @@ import {
 } from "@/services/displayMessages";
 import { handleFetchQuestionById } from "@/services/questions/questionsRequest";
 import { useAuth } from "@/contexts/AuthContext";
+import { MediaPicker } from "@/components/data/MediaPicker";
 
 export default function UpdateQuestionPage() {
   const router = useRouter();
@@ -69,6 +70,7 @@ export default function UpdateQuestionPage() {
     []
   );
   const [hasLoadedInitialData, setHasLoadedInitialData] = useState(false);
+  const contentTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Monitor form data changes for debugging
   useEffect(() => {
@@ -261,6 +263,37 @@ export default function UpdateQuestionPage() {
       dispatch(setQuestionFormData({ field, value }));
     },
     [dispatch]
+  );
+
+  // Handle media insertion at cursor position
+  const handleInsertMedia = useCallback(
+    (markdown: string) => {
+      const textarea = contentTextareaRef.current;
+      if (!textarea) {
+        // Fallback: just append to content
+        const currentContent = formData.content || "";
+        handleInputChange("content", currentContent + markdown);
+        return;
+      }
+
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const currentContent = formData.content || "";
+      const newContent =
+        currentContent.substring(0, start) +
+        markdown +
+        currentContent.substring(end);
+
+      handleInputChange("content", newContent);
+
+      // Restore cursor position after the inserted text
+      setTimeout(() => {
+        textarea.focus();
+        const newCursorPos = start + markdown.length;
+        textarea.setSelectionRange(newCursorPos, newCursorPos);
+      }, 0);
+    },
+    [formData.content, handleInputChange]
   );
 
   // Handle question type change
@@ -907,9 +940,13 @@ export default function UpdateQuestionPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="content">Question Content</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="content">Question Content</Label>
+                  <MediaPicker onInsert={handleInsertMedia} />
+                </div>
                 <Textarea
                   id="content"
+                  ref={contentTextareaRef}
                   value={formData.content}
                   onChange={(e) => handleInputChange("content", e.target.value)}
                   placeholder="Enter the question content. You can use LaTeX math: $E = mc^2$ or $$\frac{d}{dx}\sin x = \cos x$$"
