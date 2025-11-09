@@ -183,10 +183,13 @@ export default function QuestionsPage() {
     const nameFromUrl = router.query.name as string;
     // if (nameFromUrl) dispatch(setQuestionReqParams({ name: nameFromUrl }));
 
+    const typeFromUrl = router.query.type as string;
+
     const reqParams = {
       name:
         nameFromUrl && nameFromUrl?.length > 0 ? nameFromUrl : undefined,
       page_number: !isNaN(pageFromUrl) ? pageFromUrl : undefined,
+      type: typeFromUrl,
     };
     removeNulls(reqParams);
     dispatch(setQuestionReqParams(reqParams));
@@ -232,7 +235,8 @@ export default function QuestionsPage() {
         questionReqParams?.page_number,
         questionReqParams?.page_size,
         questionReqParams?.name,
-        questionReqParams?.sub_topic_id
+        questionReqParams?.sub_topic_id,
+        questionReqParams?.type
       );
 
       if ((results as { error: string })?.error) {
@@ -257,6 +261,7 @@ export default function QuestionsPage() {
     questionReqParams?.page_size,
     questionReqParams?.name,
     questionReqParams?.sub_topic_id,
+    questionReqParams?.type,
     dispatch,
     authContext?.token,
   ]);
@@ -399,9 +404,7 @@ export default function QuestionsPage() {
   const handleTypeFilterChange = useCallback(
     (value: string) => {
       dispatch(setQuestionTableFilters({ typeFilter: value }));
-      dispatch(setQuestionReqParams({ page_number: 1 }));
-
-      setTimeout(applyFilters, 800);
+      dispatch(setQuestionReqParams({ page_number: 1, type: value || undefined }));
 
       // update url
       const query = { ...router.query, type: value || undefined, page: "1" };
@@ -410,7 +413,7 @@ export default function QuestionsPage() {
         shallow: true,
       });
     },
-    [applyFilters, dispatch, router]
+    [dispatch, router]
   );
 
   const handleSort = useCallback(

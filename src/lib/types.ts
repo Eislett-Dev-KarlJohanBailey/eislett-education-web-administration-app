@@ -43,4 +43,5 @@ export interface QuestionFormData {
   multipleChoiceOptions: QuestionOption[];
   shortAnswers?: SimpleShortAnswersOption[];
   explanation: string;
+  hidden: boolean;
 }

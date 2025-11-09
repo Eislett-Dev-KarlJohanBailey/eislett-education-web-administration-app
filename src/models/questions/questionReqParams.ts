@@ -3,4 +3,5 @@ export interface QuestionReqParams {
   page_size: number;
   sub_topic_id?: string;
   name?: string;
+  type?: string;
 }

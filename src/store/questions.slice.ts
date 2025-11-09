@@ -14,6 +14,7 @@ interface QuestionReqParams {
   page_size: number;
   sub_topic_id: string | undefined;
   name: string | undefined;
+  type: string | undefined;
 }
 
 interface FilterTypes {
@@ -50,6 +51,7 @@ const initialState = {
     page_size: DEFAULT_PAGE_SIZE,
     sub_topic_id: undefined as string | undefined, // selected subtopic
     name: undefined,
+    type: undefined as string | undefined,
   },
   totalQuestion: 0,
   filters: {
@@ -83,6 +85,7 @@ const initialState = {
     ],
     shortAnswers: [],
     explanation: "",
+    hidden: false,
   },
   subtopicsToLink: [] as string[],
 };

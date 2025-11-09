@@ -83,6 +83,7 @@ export default function UpdateQuestionPage() {
     });
   }, [formData.title, router.query.duplicate, hasLoadedInitialData]);
 
+
   // Initialize form data from URL query
   useEffect(() => {
     if (router.isReady && router.query.questionId) {
