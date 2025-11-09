@@ -23,7 +23,12 @@ async function handleFetchQuestionById(
       },
     });
 
-    return (await rawResponse.json()) as QuestionDetails;
+    const question = (await rawResponse.json()) as QuestionDetails;
+    // Ensure hidden is always a boolean
+    if (typeof question.hidden !== 'boolean') {
+      question.hidden = false;
+    }
+    return question;
   } catch (e) {
     toast({
       title: "Error fetching question",
@@ -66,10 +71,18 @@ async function handleFetchQuestions(
       }
     );
 
-    return (await rawResponse.json()) as {
+    const response = (await rawResponse.json()) as {
       data: QuestionDetails[];
       amount: number;
     };
+    // Ensure hidden is always a boolean for all questions
+    if (response.data) {
+      response.data = response.data.map(question => ({
+        ...question,
+        hidden: typeof question.hidden === 'boolean' ? question.hidden : false
+      }));
+    }
+    return response;
   } catch (e) {
     toast({
       title: "Error fetching list of questions",

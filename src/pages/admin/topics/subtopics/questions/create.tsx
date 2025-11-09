@@ -30,6 +30,7 @@ import { QuestionDetails } from "@/models/questions/questionDetails";
 import { handleFetchSubTopics } from "@/services/subtopics/subTopicsRequest";
 import { toast } from "@/hooks/use-toast";
 import { useAppDispatch, useAppSelector } from "@/store/hook";
+import { store } from "@/store/store";
 import { SubTopicDetails } from "@/models/subTopic/subTopicDetails";
 import {
   getQuestionFormData,
@@ -93,6 +94,11 @@ export default function CreateQuestionPage() {
 
   const formData = useAppSelector(getQuestionFormData);
   const questionSubtopics = useAppSelector(getQuestionFormSubtopics);
+
+  // Debug: Log when formData.hidden changes
+  useEffect(() => {
+    console.log('Create - formData.hidden changed:', formData?.hidden, 'Type:', typeof formData?.hidden);
+  }, [formData?.hidden]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [subtopics, setSubtopics] = useState<SubTopicDetails[]>([]);
@@ -161,6 +167,7 @@ export default function CreateQuestionPage() {
   // Update form data
   const handleInputChange = useCallback(
     (field: keyof QuestionFormData, value: any) => {
+      console.log('Create - handleInputChange called:', { field, value, valueType: typeof value });
       // setFormData(prev => ({ ...prev, [field]: value }))
       dispatch(setQuestionFormData({ field, value }));
     },
@@ -646,6 +653,23 @@ export default function CreateQuestionPage() {
                 (el) => el?.content?.toLowerCase() === "true"
               )?.isCorrect;
 
+        // Store hidden value - read directly from Redux store to ensure we get the latest value
+        // This bypasses any selector caching issues
+        const currentState = store.getState();
+        const directHiddenValue = currentState.QuestionPageSlice.questionFormData.hidden;
+        
+        console.log('Create - formData object:', formData);
+        console.log('Create - formData.hidden raw value:', formData?.hidden);
+        console.log('Create - formData.hidden type:', typeof formData?.hidden);
+        console.log('Create - Direct state hidden value:', directHiddenValue, 'Type:', typeof directHiddenValue);
+        console.log('Create - formData.hidden === true:', formData?.hidden === true);
+        console.log('Create - formData.hidden === false:', formData?.hidden === false);
+        
+        // ALWAYS use the direct state value - this is the source of truth
+        // The selector might be returning stale data, so we read directly from the store
+        const hiddenValue = directHiddenValue === true ? true : false;
+        console.log('Create - hiddenValue after processing (from direct state):', hiddenValue);
+
         let params = {
           title: formData?.title,
           content: formData?.content,
@@ -664,9 +688,17 @@ export default function CreateQuestionPage() {
               : null,
           isTrue: isTrue,
           explanation: formData?.explanation,
+          hidden: hiddenValue,
         };
 
+        // Remove nulls (this should preserve false, but we'll restore hidden anyway)
         params = removeNulls(params) as any;
+        
+        // Always explicitly set hidden after removeNulls to ensure it's included
+        params.hidden = hiddenValue;
+
+        console.log('Create Question - hidden value:', hiddenValue);
+        console.log('Create Question - params after removeNulls:', JSON.stringify(params, null, 2));
 
         const rawResponse = await fetch("/api/questions", {
           method: "POST",
@@ -969,6 +1001,23 @@ export default function CreateQuestionPage() {
                     Add
                   </Button>
                 </div>
+              </div>
+
+              <div className="flex items-center justify-between space-x-2">
+                <div className="space-y-0.5">
+                  <Label htmlFor="hidden">Hidden</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Hide this question from students
+                  </p>
+                </div>
+                <Switch
+                  id="hidden"
+                  checked={formData.hidden}
+                  onCheckedChange={(checked) => {
+                    console.log('Create - Switch toggled, new value:', checked);
+                    handleInputChange("hidden", checked);
+                  }}
+                />
               </div>
 
               <div className="space-y-2">

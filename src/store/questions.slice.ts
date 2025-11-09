@@ -22,6 +22,7 @@ interface FilterTypes {
   sortDirection: direction;
   subtopicFilter: string | undefined;
   typeFilter: string | undefined;
+  hiddenFilter: string | undefined; // "true" | "false" | undefined
 }
 
 interface QuestionPageSliceState {
@@ -59,6 +60,7 @@ const initialState = {
     sortDirection: "asc" as direction,
     subtopicFilter: undefined as string | undefined,
     typeFilter: undefined as string | undefined,
+    hiddenFilter: undefined as string | undefined,
   },
   delete: {
     questionId: undefined as string | undefined,
@@ -169,10 +171,17 @@ export const QuestionPageSlice = createSlice({
       state: QuestionPageSliceState,
       action: PayloadAction<{ field: keyof QuestionFormData; value: any }>
     ) => {
+      console.log('Redux reducer - setQuestionFormData called:', { 
+        field: action.payload.field, 
+        value: action.payload.value,
+        valueType: typeof action.payload.value,
+        currentHidden: state.questionFormData.hidden
+      });
       state.questionFormData = {
         ...state.questionFormData,
         [action.payload.field]: action.payload.value,
       };
+      console.log('Redux reducer - after update, hidden is:', state.questionFormData.hidden);
     },
 
     // for create form

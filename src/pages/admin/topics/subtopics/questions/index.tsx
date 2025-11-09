@@ -121,6 +121,14 @@ export default function QuestionsPage() {
       );
     }
 
+    if (filters.hiddenFilter !== undefined) {
+      const isHidden = filters.hiddenFilter === "true";
+      result = result.filter((question) => {
+        const questionHidden = typeof question.hidden === 'boolean' ? question.hidden : false;
+        return questionHidden === isHidden;
+      });
+    }
+
     result.sort((a, b) => {
       let comparison = 0;
       const valA = a[filters.sortColumn as keyof QuestionDetails];
@@ -136,6 +144,11 @@ export default function QuestionsPage() {
             b.subTopics.map((el) => el.id).includes(String(s.id))
           )?.name || "";
         comparison = subtopicA.localeCompare(subtopicB);
+      } else if (filters.sortColumn === "hidden") {
+        // Sort booleans: false (visible) comes before true (hidden)
+        const boolA = typeof valA === 'boolean' ? (valA ? 1 : 0) : 0;
+        const boolB = typeof valB === 'boolean' ? (valB ? 1 : 0) : 0;
+        comparison = boolA - boolB;
       } else if (typeof valA === "string" && typeof valB === "string") {
         comparison = valA.localeCompare(valB);
       } else if (typeof valA === "number" && typeof valB === "number") {
@@ -206,6 +219,8 @@ export default function QuestionsPage() {
     // if (typeFilterFromUrl)
     //   dispatch(setQuestionTableFilters({ typeFilter: typeFilterFromUrl }))
 
+    const hiddenFilterFromUrl = router.query.hidden as string;
+
     const filterParams = {
       typeFilter: typeFilterFromUrl,
       sortColumn: sortColumnFromUrl,
@@ -214,6 +229,7 @@ export default function QuestionsPage() {
           ? sortDirectionFromUrl
           : undefined,
       subtopicFilter: subtopicFilterFromUrl,
+      hiddenFilter: hiddenFilterFromUrl === "true" || hiddenFilterFromUrl === "false" ? hiddenFilterFromUrl : undefined,
     };
     dispatch(setQuestionTableFilters(filterParams));
 
@@ -416,6 +432,24 @@ export default function QuestionsPage() {
     [dispatch, router]
   );
 
+  const handleHiddenFilterChange = useCallback(
+    (value: string) => {
+      dispatch(setQuestionTableFilters({ hiddenFilter: value }));
+      dispatch(setQuestionReqParams({ page_number: 1 }));
+
+      // update url
+      const query = { ...router.query, hidden: value || undefined, page: "1" };
+      if (!value) delete query.hidden;
+      router.push({ pathname: router.pathname, query }, undefined, {
+        shallow: true,
+      });
+      
+      // Apply filters after a short delay to ensure state is updated
+      setTimeout(applyFilters, 100);
+    },
+    [dispatch, router, applyFilters]
+  );
+
   const handleSort = useCallback(
     (column: string, direction: "asc" | "desc") => {
       dispatch(
@@ -496,12 +530,27 @@ export default function QuestionsPage() {
           { label: "Short Answer", value: QuestionType.SHORT_ANSWER },
         ],
       },
+      {
+        id: "hidden",
+        label: "Hidden Status",
+        type: "select" as const,
+        value: filters.hiddenFilter,
+        onChange: handleHiddenFilterChange,
+        placeholder: "",
+        options: [
+          { label: "All Questions", value: undefined },
+          { label: "Visible Only", value: "false" },
+          { label: "Hidden Only", value: "true" },
+        ],
+      },
     ],
     [
       filters.subtopicFilter,
       filters.typeFilter,
+      filters.hiddenFilter,
       handleSubtopicFilterChange,
       handleTypeFilterChange,
+      handleHiddenFilterChange,
       subtopics,
     ]
   );
@@ -509,11 +558,24 @@ export default function QuestionsPage() {
   const columns = useMemo(
     () => [
       {
-        id: "id",
-        header: "ID",
-        cell: (question: QuestionDetails) => (
-          <span className="text-muted-foreground text-sm">{question.id}</span>
-        ),
+        id: "hidden",
+        header: "Hidden",
+        cell: (question: QuestionDetails) => {
+          const isHidden = typeof question.hidden === 'boolean' ? question.hidden : false;
+          return (
+            <div className="flex items-center justify-center">
+              {isHidden ? (
+                <Badge variant="destructive" className="text-xs">
+                  Hidden
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="text-xs text-muted-foreground">
+                  Visible
+                </Badge>
+              )}
+            </div>
+          );
+        },
         sortable: true,
       },
       {
@@ -673,6 +735,8 @@ export default function QuestionsPage() {
     () => [
       { label: "Title (A-Z)", value: "title_asc" },
       { label: "Title (Z-A)", value: "title_desc" },
+      { label: "Hidden (Visible First)", value: "hidden_asc" },
+      { label: "Hidden (Hidden First)", value: "hidden_desc" },
       { label: "Subtopic (A-Z)", value: "subtopic_asc" },
       { label: "Subtopic (Z-A)", value: "subtopic_desc" },
       { label: "Difficulty (Low to High)", value: "difficultyLevel_asc" },
@@ -738,7 +802,7 @@ export default function QuestionsPage() {
         onRefresh={applyFilters}
         className="px-2 sm:px-4"
         defaultSort={currentSortValue}
-        defaultShowFilters={!!filters.subtopicFilter || !!filters.typeFilter}
+        defaultShowFilters={!!filters.subtopicFilter || !!filters.typeFilter || !!filters.hiddenFilter}
       >
         <DataTable
           data={getPaginatedData}

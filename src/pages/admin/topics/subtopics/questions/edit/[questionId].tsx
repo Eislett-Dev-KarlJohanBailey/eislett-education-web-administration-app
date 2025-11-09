@@ -30,6 +30,7 @@ import { QuestionDetails } from "@/models/questions/questionDetails";
 import { handleFetchSubTopics } from "@/services/subtopics/subTopicsRequest";
 import { toast } from "@/hooks/use-toast";
 import { useAppDispatch, useAppSelector } from "@/store/hook";
+import { store } from "@/store/store";
 import { SubTopicDetails } from "@/models/subTopic/subTopicDetails";
 import {
   getQuestionFormData,
@@ -59,6 +60,11 @@ export default function UpdateQuestionPage() {
   const formData = useAppSelector(getQuestionFormData);
   const questionSubtopics = useAppSelector(getQuestionFormSubtopics);
   const isLoading = useAppSelector(getQuestionFormIsLoading);
+
+  // Debug: Log when formData.hidden changes
+  useEffect(() => {
+    console.log('Edit - formData.hidden changed:', formData?.hidden, 'Type:', typeof formData?.hidden);
+  }, [formData?.hidden]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [subtopics, setSubtopics] = useState<SubTopicDetails[]>([]);
@@ -143,6 +149,7 @@ export default function UpdateQuestionPage() {
           difficultyLevel: questionData?.difficultyLevel || 0.1,
           type: questionData?.type || QuestionType.MULTIPLE_CHOICE,
           explanation: questionData?.explanation || "",
+          hidden: typeof questionData?.hidden === 'boolean' ? questionData.hidden : false,
         };
 
         let newOptions = [];
@@ -208,6 +215,7 @@ export default function UpdateQuestionPage() {
         dispatch(setQuestionFormData({ field: 'difficultyLevel', value: data.difficultyLevel }));
         dispatch(setQuestionFormData({ field: 'type', value: data.type }));
         dispatch(setQuestionFormData({ field: 'explanation', value: data.explanation }));
+        dispatch(setQuestionFormData({ field: 'hidden', value: data.hidden }));
         dispatch(setQuestionFormData({ field: 'multipleChoiceOptions', value: (data as any).multipleChoiceOptions || [] }));
         dispatch(setQuestionFormData({ field: 'shortAnswers', value: newShortAnswers }));
         
@@ -260,6 +268,7 @@ export default function UpdateQuestionPage() {
   // Update form data
   const handleInputChange = useCallback(
     (field: keyof QuestionFormData, value: any) => {
+      console.log('Edit - handleInputChange called:', { field, value, valueType: typeof value });
       // setFormData(prev => ({ ...prev, [field]: value }))
       dispatch(setQuestionFormData({ field, value }));
     },
@@ -769,6 +778,23 @@ export default function UpdateQuestionPage() {
                 (el) => el?.content?.toLowerCase() === "true"
               )?.isCorrect;
 
+        // Store hidden value - read directly from Redux store to ensure we get the latest value
+        // This bypasses any selector caching issues
+        const currentState = store.getState();
+        const directHiddenValue = currentState.QuestionPageSlice.questionFormData.hidden;
+        
+        console.log('Edit - formData object:', formData);
+        console.log('Edit - formData.hidden raw value:', formData?.hidden);
+        console.log('Edit - formData.hidden type:', typeof formData?.hidden);
+        console.log('Edit - Direct state hidden value:', directHiddenValue, 'Type:', typeof directHiddenValue);
+        console.log('Edit - formData.hidden === true:', formData?.hidden === true);
+        console.log('Edit - formData.hidden === false:', formData?.hidden === false);
+        
+        // ALWAYS use the direct state value - this is the source of truth
+        // The selector might be returning stale data, so we read directly from the store
+        const hiddenValue = directHiddenValue === true ? true : false;
+        console.log('Edit - hiddenValue after processing (from direct state):', hiddenValue);
+
         let params = {
           questionDetails: {
             title: formData?.title,
@@ -788,13 +814,24 @@ export default function UpdateQuestionPage() {
                 : null,
             isTrue: isTrue,
             explanation: formData?.explanation,
+            hidden: hiddenValue,
           },
           id: formData.id,
         };
 
+        // Remove nulls (this should preserve false, but we'll restore hidden anyway)
         params = removeNulls(params) as any;
+        
+        // Always explicitly set hidden after removeNulls to ensure it's included
+        if (params.questionDetails) {
+          params.questionDetails.hidden = hiddenValue;
+        } else {
+          // This shouldn't happen, but handle it just in case
+          (params as any).questionDetails = { hidden: hiddenValue };
+        }
 
-        console.log('API Request params:', params);
+        console.log('Update Question - hidden value:', hiddenValue);
+        console.log('Update Question - params after removeNulls:', JSON.stringify(params, null, 2));
         console.log('API Request method:', isDuplicate ? "POST" : "PUT");
 
         const rawResponse = await fetch("/api/questions", {
@@ -1118,6 +1155,23 @@ export default function UpdateQuestionPage() {
                     Add
                   </Button>
                 </div>
+              </div>
+
+              <div className="flex items-center justify-between space-x-2">
+                <div className="space-y-0.5">
+                  <Label htmlFor="hidden">Hidden</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Hide this question from students
+                  </p>
+                </div>
+                <Switch
+                  id="hidden"
+                  checked={formData.hidden}
+                  onCheckedChange={(checked) => {
+                    console.log('Edit - Switch toggled, new value:', checked);
+                    handleInputChange("hidden", checked);
+                  }}
+                />
               </div>
 
               <div className="space-y-2">

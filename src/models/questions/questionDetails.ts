@@ -18,5 +18,5 @@ export interface QuestionDetails {
   multipleChoiceOptions?: QuestionOptionDetails[];
   shortAnswers?: SimpleShortAnswersOption[];
   explanation: string;
-  hidden?: boolean;
+  hidden: boolean;
 }
