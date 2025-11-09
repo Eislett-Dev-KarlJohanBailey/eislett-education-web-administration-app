@@ -46,7 +46,8 @@ async function handleFetchQuestions(
   page_size: number,
   name?: string,
   sub_topic_id?: string,
-  type?: string
+  type?: string,
+  hidden?: string
 ): Promise<returnType> {
   try {
     const params: QuestionReqParams = {
@@ -55,6 +56,7 @@ async function handleFetchQuestions(
       name: name,
       sub_topic_id: sub_topic_id,
       type: type,
+      hidden: hidden,
     };
 
     removeNulls(params);

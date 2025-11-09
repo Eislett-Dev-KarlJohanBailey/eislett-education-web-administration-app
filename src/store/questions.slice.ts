@@ -15,6 +15,7 @@ interface QuestionReqParams {
   sub_topic_id: string | undefined;
   name: string | undefined;
   type: string | undefined;
+  hidden: string | undefined;
 }
 
 interface FilterTypes {
@@ -53,6 +54,7 @@ const initialState = {
     sub_topic_id: undefined as string | undefined, // selected subtopic
     name: undefined,
     type: undefined as string | undefined,
+    hidden: undefined as string | undefined,
   },
   totalQuestion: 0,
   filters: {

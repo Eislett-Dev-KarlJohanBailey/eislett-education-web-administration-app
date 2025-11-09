@@ -4,4 +4,5 @@ export interface QuestionReqParams {
   sub_topic_id?: string;
   name?: string;
   type?: string;
+  hidden?: string; // "true" | "false" | undefined
 }

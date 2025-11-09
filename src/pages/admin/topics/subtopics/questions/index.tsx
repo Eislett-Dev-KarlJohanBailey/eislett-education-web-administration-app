@@ -232,6 +232,11 @@ export default function QuestionsPage() {
       hiddenFilter: hiddenFilterFromUrl === "true" || hiddenFilterFromUrl === "false" ? hiddenFilterFromUrl : undefined,
     };
     dispatch(setQuestionTableFilters(filterParams));
+    
+    // Also set the hidden parameter in questionReqParams for API calls
+    if (hiddenFilterFromUrl === "true" || hiddenFilterFromUrl === "false") {
+      dispatch(setQuestionReqParams({ hidden: hiddenFilterFromUrl }));
+    }
 
     // applyFilters()
   }, [router.isReady, router.query, dispatch]);
@@ -252,7 +257,8 @@ export default function QuestionsPage() {
         questionReqParams?.page_size,
         questionReqParams?.name,
         questionReqParams?.sub_topic_id,
-        questionReqParams?.type
+        questionReqParams?.type,
+        questionReqParams?.hidden
       );
 
       if ((results as { error: string })?.error) {
@@ -278,6 +284,7 @@ export default function QuestionsPage() {
     questionReqParams?.name,
     questionReqParams?.sub_topic_id,
     questionReqParams?.type,
+    questionReqParams?.hidden,
     dispatch,
     authContext?.token,
   ]);
@@ -435,7 +442,7 @@ export default function QuestionsPage() {
   const handleHiddenFilterChange = useCallback(
     (value: string) => {
       dispatch(setQuestionTableFilters({ hiddenFilter: value }));
-      dispatch(setQuestionReqParams({ page_number: 1 }));
+      dispatch(setQuestionReqParams({ page_number: 1, hidden: value || undefined }));
 
       // update url
       const query = { ...router.query, hidden: value || undefined, page: "1" };
@@ -443,11 +450,8 @@ export default function QuestionsPage() {
       router.push({ pathname: router.pathname, query }, undefined, {
         shallow: true,
       });
-      
-      // Apply filters after a short delay to ensure state is updated
-      setTimeout(applyFilters, 100);
     },
-    [dispatch, router, applyFilters]
+    [dispatch, router]
   );
 
   const handleSort = useCallback(
