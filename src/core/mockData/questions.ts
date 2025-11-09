@@ -12,6 +12,7 @@ const MOCK_QUESTIONS: QuestionDetails[] = [
     type: QuestionType.MULTIPLE_CHOICE,
     totalPotentialMarks: 2,
     difficultyLevel: 0.6,
+    hidden: false,
     subTopics: [
       {
         id: "1",
@@ -42,6 +43,7 @@ const MOCK_QUESTIONS: QuestionDetails[] = [
     type: QuestionType.MULTIPLE_CHOICE,
     totalPotentialMarks: 1,
     difficultyLevel: 0.3,
+    hidden: false,
     subTopics: [
       {
         id: "2",
@@ -72,6 +74,7 @@ const MOCK_QUESTIONS: QuestionDetails[] = [
     type: QuestionType.TRUE_FALSE,
     totalPotentialMarks: 1,
     difficultyLevel: 0.2,
+    hidden: false,
     subTopics: [
       {
         id: "3",
@@ -100,6 +103,7 @@ const MOCK_QUESTIONS: QuestionDetails[] = [
     type: QuestionType.TRUE_FALSE,
     totalPotentialMarks: 1,
     difficultyLevel: 0.4,
+    hidden: false,
     subTopics: [
       {
         id: "4",
