@@ -327,14 +327,24 @@ export default function QuestionsPage() {
 
   const handleEdit = useCallback(
     (id: number | string) => {
-      router.push(`/admin/topics/subtopics/questions/edit/${id}`);
+      // Pass the current page as returnTo so we can navigate back after editing
+      const currentPath = router.asPath || router.pathname;
+      router.push({
+        pathname: `/admin/topics/subtopics/questions/edit/${id}`,
+        query: { returnTo: currentPath },
+      });
     },
     [router]
   );
 
   const handleDuplicate = useCallback(
     (id: number | string) => {
-      router.push(`/admin/topics/subtopics/questions/edit/${id}?duplicate=true`);
+      // Pass the current page as returnTo so we can navigate back after duplicating
+      const currentPath = router.asPath || router.pathname;
+      router.push({
+        pathname: `/admin/topics/subtopics/questions/edit/${id}`,
+        query: { duplicate: 'true', returnTo: currentPath },
+      });
     },
     [router]
   );

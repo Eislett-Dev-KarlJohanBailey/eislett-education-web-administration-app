@@ -76,6 +76,7 @@ export default function UpdateQuestionPage() {
     []
   );
   const [hasLoadedInitialData, setHasLoadedInitialData] = useState(false);
+  const [returnTo, setReturnTo] = useState<string | null>(null);
   const contentTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Monitor form data changes for debugging
@@ -90,14 +91,42 @@ export default function UpdateQuestionPage() {
   }, [formData.title, router.query.duplicate, hasLoadedInitialData]);
 
 
-  // Initialize form data from URL query
+  // Store return path when component mounts
+  useEffect(() => {
+    if (router.isReady) {
+      // Check if returnTo is in query params, otherwise use referrer or default
+      const returnToParam = router.query.returnTo as string;
+      if (returnToParam) {
+        setReturnTo(returnToParam);
+      } else if (typeof window !== 'undefined' && document.referrer) {
+        // Try to extract the path from referrer if it's from the same origin
+        try {
+          const referrerUrl = new URL(document.referrer);
+          const currentUrl = new URL(window.location.href);
+          if (referrerUrl.origin === currentUrl.origin && referrerUrl.pathname !== currentUrl.pathname) {
+            setReturnTo(referrerUrl.pathname + referrerUrl.search);
+          }
+        } catch (e) {
+          // If referrer parsing fails, use default
+        }
+      }
+    }
+  }, [router.isReady, router.query.returnTo]);
+
+  // Reset form and reload when questionId changes
   useEffect(() => {
     if (router.isReady && router.query.questionId) {
+      const questionId = String(router.query.questionId);
       const isDuplicate = router.query.duplicate === 'true';
+      
+      // Reset the loaded flag when questionId changes
+      setHasLoadedInitialData(false);
+      
+      // Set the ID in form data
       dispatch(
         setQuestionFormData({
           field: "id",
-          value: isDuplicate ? "" : String(router.query.questionId),
+          value: isDuplicate ? "" : questionId,
         })
       );
     }
@@ -109,17 +138,19 @@ export default function UpdateQuestionPage() {
   ]);
 
   useEffect(() => {
-    // Get Question info by id - only run once when component mounts
-    if (hasLoadedInitialData) return;
+    // Get Question info by id - only run once per questionId
+    if (hasLoadedInitialData || !router.isReady) return;
     
-    console.log("Fetching questions");
+    const questionId = router.query.questionId as string;
+    if (!questionId) return;
+    
+    console.log("Fetching question:", questionId);
     async function getQuestion() {
       dispatch(setQuestionFormIsLoading(true));
       let links = []; // existing subtopic links
-      const questionId = formData?.id || router.query.questionId;
       const results = await handleFetchQuestionById(
         authContext?.token,
-        questionId as string
+        questionId
       );
 
       if ((results as { error: string })?.error) {
@@ -138,7 +169,7 @@ export default function UpdateQuestionPage() {
         console.log('Original title:', questionData?.title);
         
         const data = {
-          id: isDuplicate ? "" : (formData.id || questionId),
+          id: isDuplicate ? "" : questionId,
           title: isDuplicate 
             ? `Copy of ${questionData?.title || 'Question'}` 
             : (questionData?.title || ''),
@@ -232,8 +263,8 @@ export default function UpdateQuestionPage() {
       setExistingSubtopicLinks(links);
     }
 
-    if (formData.id || router.query.questionId) getQuestion();
-  }, [authContext?.token, dispatch, formData.id, router.query.questionId, hasLoadedInitialData, router.query.duplicate]);
+    if (router.query.questionId) getQuestion();
+  }, [authContext?.token, dispatch, router.query.questionId, router.query.duplicate, hasLoadedInitialData]);
 
   //  GET LIST OF SUB TOPICS
   useEffect(() => {
@@ -666,10 +697,35 @@ export default function UpdateQuestionPage() {
         return;
       }
       
-      // Validation
-      if (!isDuplicate && !formData.id) {
-        displayErrorMessage("Missing question id", "No question id found");
-        return;
+      // CRITICAL: Validate that the form data ID matches the URL questionId
+      // This prevents updating the wrong question if state gets mixed up
+      const urlQuestionId = router.query.questionId as string;
+      const currentState = store.getState();
+      const currentFormData = currentState.QuestionPageSlice.questionFormData;
+      const formDataId = (currentFormData as any).id || formData.id;
+      
+      if (!isDuplicate) {
+        if (!urlQuestionId) {
+          displayErrorMessage("Missing question id", "No question id found in URL");
+          return;
+        }
+        if (!formDataId) {
+          displayErrorMessage("Missing question id", "No question id found in form");
+          return;
+        }
+        if (String(formDataId) !== String(urlQuestionId)) {
+          displayErrorMessage(
+            "Data mismatch", 
+            `Form data ID (${formDataId}) does not match URL question ID (${urlQuestionId}). Please reload the page.`
+          );
+          console.error('ID MISMATCH:', {
+            formDataId,
+            urlQuestionId,
+            formData: currentFormData,
+            routerQuery: router.query
+          });
+          return;
+        }
       }
       
       // Check if title exists and is not empty
@@ -770,53 +826,44 @@ export default function UpdateQuestionPage() {
       setIsSubmitting(true);
 
       try {
-        const isTrue =
-          formData?.type === QuestionType.MULTIPLE_CHOICE ||
-          formData?.type === QuestionType.SHORT_ANSWER
-            ? undefined
-            : formData?.multipleChoiceOptions.find(
-                (el) => el?.content?.toLowerCase() === "true"
-              )?.isCorrect;
-
-        // Store hidden value - read directly from Redux store to ensure we get the latest value
+        // Read ALL form data directly from Redux store to ensure we get the latest values
         // This bypasses any selector caching issues
         const currentState = store.getState();
-        const directHiddenValue = currentState.QuestionPageSlice.questionFormData.hidden;
+        const currentFormData = currentState.QuestionPageSlice.questionFormData;
         
-        console.log('Edit - formData object:', formData);
-        console.log('Edit - formData.hidden raw value:', formData?.hidden);
-        console.log('Edit - formData.hidden type:', typeof formData?.hidden);
-        console.log('Edit - Direct state hidden value:', directHiddenValue, 'Type:', typeof directHiddenValue);
-        console.log('Edit - formData.hidden === true:', formData?.hidden === true);
-        console.log('Edit - formData.hidden === false:', formData?.hidden === false);
+        const isTrue =
+          currentFormData.type === QuestionType.MULTIPLE_CHOICE ||
+          currentFormData.type === QuestionType.SHORT_ANSWER
+            ? undefined
+            : currentFormData.multipleChoiceOptions.find(
+                (el) => el?.content?.toLowerCase() === "true"
+              )?.isCorrect;
         
-        // ALWAYS use the direct state value - this is the source of truth
-        // The selector might be returning stale data, so we read directly from the store
-        const hiddenValue = directHiddenValue === true ? true : false;
-        console.log('Edit - hiddenValue after processing (from direct state):', hiddenValue);
+        // Get hidden value
+        const hiddenValue = currentFormData.hidden === true ? true : false;
 
         let params = {
           questionDetails: {
-            title: formData?.title,
-            content: formData?.content,
-            description: formData?.description,
-            tags: formData?.tags,
-            totalPotentialMarks: formData?.totalPotentialMarks,
-            difficultyLevel: formData?.difficultyLevel,
-            type: formData?.type,
+            title: currentFormData.title,
+            content: currentFormData.content,
+            description: currentFormData.description,
+            tags: currentFormData.tags,
+            totalPotentialMarks: currentFormData.totalPotentialMarks,
+            difficultyLevel: currentFormData.difficultyLevel,
+            type: currentFormData.type,
             multipleChoiceOptions:
-              formData?.type === QuestionType.MULTIPLE_CHOICE
-                ? formData?.multipleChoiceOptions
+              currentFormData.type === QuestionType.MULTIPLE_CHOICE
+                ? currentFormData.multipleChoiceOptions
                 : null,
             shortAnswers:
-              formData?.type === QuestionType.SHORT_ANSWER
-                ? formData?.shortAnswers
+              currentFormData.type === QuestionType.SHORT_ANSWER
+                ? currentFormData.shortAnswers
                 : null,
             isTrue: isTrue,
-            explanation: formData?.explanation,
+            explanation: currentFormData.explanation,
             hidden: hiddenValue,
           },
-          id: formData.id,
+          id: urlQuestionId, // Always use the URL questionId as the source of truth
         };
 
         // Remove nulls (this should preserve false, but we'll restore hidden anyway)
@@ -877,10 +924,14 @@ export default function UpdateQuestionPage() {
         else {
           dispatch(resetQuestionPageSlice());
           displaySuccessMessage(`Question ${isDuplicate ? 'Created' : 'Updated'}!`);
-          setTimeout(
-            () => router.push("/admin/topics/subtopics/questions"),
-            1500
-          );
+          setTimeout(() => {
+            // Navigate back to the previous page if available, otherwise go to questions list
+            if (returnTo) {
+              router.push(returnTo);
+            } else {
+              router.back();
+            }
+          }, 1500);
         }
       } catch (e) {
         console.log("On Submit Error", e);
@@ -904,6 +955,7 @@ export default function UpdateQuestionPage() {
       handleUnLinkingSubtopics,
       questionSubtopics?.length,
       router,
+      returnTo,
     ]
   );
 
@@ -924,14 +976,26 @@ export default function UpdateQuestionPage() {
       <div className="container py-6 space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <Button variant="ghost" size="icon" onClick={() => router.back()}>
+            <Button variant="ghost" size="icon" onClick={() => {
+              if (returnTo) {
+                router.push(returnTo);
+              } else {
+                router.back();
+              }
+            }}>
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <h1 className="text-2xl font-bold">Update New Question</h1>
           </div>
 
           <div className="flex items-center space-x-2">
-            <Button variant="outline" onClick={() => router.back()}>
+            <Button variant="outline" onClick={() => {
+              if (returnTo) {
+                router.push(returnTo);
+              } else {
+                router.back();
+              }
+            }}>
               Cancel
             </Button>
             <Button onClick={handleSubmit} disabled={isSubmitting}>
@@ -1585,7 +1649,13 @@ export default function UpdateQuestionPage() {
               </Tabs>
             </CardContent>
             <CardFooter className="flex justify-between">
-              <Button variant="outline" onClick={() => router.back()}>
+              <Button variant="outline" onClick={() => {
+                if (returnTo) {
+                  router.push(returnTo);
+                } else {
+                  router.back();
+                }
+              }}>
                 Cancel
               </Button>
               <Button type="submit" disabled={isSubmitting}>
