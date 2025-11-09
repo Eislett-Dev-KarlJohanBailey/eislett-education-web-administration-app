@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useContext, useMemo } from "react";
+import { useEffect, useState, useCallback, useContext, useMemo, useRef } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { DataManagementLayout } from "@/components/layout/DataManagementLayout";
 import { DataTable } from "@/components/data/DataTable";
@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 // import { Question, QuestionType } from "@/lib/types"
 import { useAuth } from "@/contexts/AuthContext";
 import { useDebouncedCallback } from "use-debounce";
@@ -65,9 +66,20 @@ export default function QuestionsPage() {
   const dispatch = useAppDispatch();
   const authContext = useContext(useAuth());
 
-  const questionReqParams = useAppSelector(getQuestionReqParams);
+  // Wait for router to be ready before reading URL params
+  const isRouterReady = router.isReady;
+
+  // Read all state from URL params - single source of truth (only when router is ready)
+  const pageNumber = isRouterReady && router.query.page ? parseInt(router.query.page as string, 10) : DEFAULT_PAGE_NUMBER;
+  const pageSize = isRouterReady && router.query.pageSize ? parseInt(router.query.pageSize as string, 10) : 10;
+  const searchQuery = (isRouterReady && router.query.name as string) || "";
+  const subtopicFilter = (isRouterReady && router.query.subtopic as string) || undefined;
+  const typeFilter = (isRouterReady && router.query.type as string) || undefined;
+  const hiddenFilter = (isRouterReady && router.query.hidden as string) || undefined;
+  const sortColumn = (isRouterReady && router.query.sortColumn as string) || undefined;
+  const sortDirection = (isRouterReady && router.query.sortDirection as "asc" | "desc") || "asc";
+
   const totalQuestionAmt = useAppSelector(getQuestionAmt);
-  const filters = useAppSelector(getQuestionTableFilters);
   const deleteData = useAppSelector(getQuestionTableDeleteData);
   const isLoading = useAppSelector(getQuestionsIsLoading);
 
@@ -75,9 +87,9 @@ export default function QuestionsPage() {
   const filteredQuestions = useAppSelector(getFilteredQuestions);
   const subtopics = useAppSelector(getQuestionSubtopics);
 
-  // const [questions, setQuestions] = useState([]); //useState<Question[]>(MOCK_QUESTIONS)
-  // const [filteredQuestions, setFilteredQuestions] = useState([]); //useState<Question[]>(MOCK_QUESTIONS)
-  // const [subtopics, setSubtopics] = useState([]); // useState(MOCK_SUBTOPICS)
+  // Track the last fetch params to prevent duplicate fetches
+  const lastFetchParamsRef = useRef<string>("");
+  const hasInitialFetchRef = useRef<boolean>(false);
 
   // URL-synced state
   // const [sortColumn, setSortColumn] = useState<string>("title")
@@ -92,199 +104,194 @@ export default function QuestionsPage() {
   // const [isDeleting, setIsDeleting] = useState(false)
   // const [questionToDelete, setQuestionToDelete] = useState<string | null>(null)
 
-  // Apply all filters, sorting, and pagination
+  // Apply all filters, sorting, and pagination (client-side filtering for fetched data)
   const applyFilters = useCallback(() => {
-    console.log("Applying filters", filters);
-    dispatch(setQuestionsIsLoading(true));
+    if (questions.length === 0) {
+      dispatch(setFilteredQuestions([]));
+      return;
+    }
 
     let result = [...questions];
 
-    // if (searchQuery) {
-    //   const lowerSearch = searchQuery.toLowerCase()
-    //   result = result.filter(question =>
-    //     question.title.toLowerCase().includes(lowerSearch) ||
-    //     question.description?.toLowerCase().includes(lowerSearch) ||
-    //     question.content.toLowerCase().includes(lowerSearch) ||
-    //     question.tags.some(tag => tag.toLowerCase().includes(lowerSearch))
-    //   )
-    // }
-
-    if (filters.subtopicFilter) {
+    if (subtopicFilter) {
       result = result.filter((question) =>
-        question.subTopics.map((el) => el.id).includes(filters.subtopicFilter)
+        question.subTopics.map((el) => el.id).includes(subtopicFilter)
       );
     }
 
-    if (filters.typeFilter) {
+    if (typeFilter) {
       result = result.filter(
-        (question) => question.type === filters.typeFilter
+        (question) => question.type === typeFilter
       );
     }
 
-    if (filters.hiddenFilter !== undefined) {
-      const isHidden = filters.hiddenFilter === "true";
+    if (hiddenFilter !== undefined) {
+      const isHidden = hiddenFilter === "true";
       result = result.filter((question) => {
         const questionHidden = typeof question.hidden === 'boolean' ? question.hidden : false;
         return questionHidden === isHidden;
       });
     }
 
-    result.sort((a, b) => {
-      let comparison = 0;
-      const valA = a[filters.sortColumn as keyof QuestionDetails];
-      const valB = b[filters.sortColumn as keyof QuestionDetails];
+    if (sortColumn) {
+      result.sort((a, b) => {
+        let comparison = 0;
+        const valA = a[sortColumn as keyof QuestionDetails];
+        const valB = b[sortColumn as keyof QuestionDetails];
 
-      if (filters.sortColumn === "subtopic") {
-        const subtopicA =
-          subtopics.find((s) =>
-            a.subTopics.map((el) => el.id).includes(String(s.id))
-          )?.name || "";
-        const subtopicB =
-          subtopics.find((s) =>
-            b.subTopics.map((el) => el.id).includes(String(s.id))
-          )?.name || "";
-        comparison = subtopicA.localeCompare(subtopicB);
-      } else if (filters.sortColumn === "hidden") {
-        // Sort booleans: false (visible) comes before true (hidden)
-        const boolA = typeof valA === 'boolean' ? (valA ? 1 : 0) : 0;
-        const boolB = typeof valB === 'boolean' ? (valB ? 1 : 0) : 0;
-        comparison = boolA - boolB;
-      } else if (typeof valA === "string" && typeof valB === "string") {
-        comparison = valA.localeCompare(valB);
-      } else if (typeof valA === "number" && typeof valB === "number") {
-        comparison = valA - valB;
-      } else if (filters.sortColumn === "createdAt") {
-        comparison =
-          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-      }
-      return filters.sortDirection === "asc" ? comparison : -comparison;
-    });
+        if (sortColumn === "subtopic") {
+          const subtopicA =
+            subtopics.find((s) =>
+              a.subTopics.map((el) => el.id).includes(String(s.id))
+            )?.name || "";
+          const subtopicB =
+            subtopics.find((s) =>
+              b.subTopics.map((el) => el.id).includes(String(s.id))
+            )?.name || "";
+          comparison = subtopicA.localeCompare(subtopicB);
+        } else if (sortColumn === "hidden") {
+          // Sort booleans: false (visible) comes before true (hidden)
+          const boolA = typeof valA === 'boolean' ? (valA ? 1 : 0) : 0;
+          const boolB = typeof valB === 'boolean' ? (valB ? 1 : 0) : 0;
+          comparison = boolA - boolB;
+        } else if (typeof valA === "string" && typeof valB === "string") {
+          comparison = valA.localeCompare(valB);
+        } else if (typeof valA === "number" && typeof valB === "number") {
+          comparison = valA - valB;
+        } else if (sortColumn === "createdAt") {
+          comparison =
+            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        }
+        return sortDirection === "asc" ? comparison : -comparison;
+      });
+    }
 
-    // const rawResponse = await fetch('/api/questions?page_number=1&page_size=5',
-    //     {
-    //       method: 'GET',
-    //       headers: {
-    //         'Accept': 'application/json, text/plain, */*',
-    //         'Content-Type': 'application/json',
-    //         "Authorization" : `Bearer ${authContext.token}`
-    //       },
-
-    //     }
-    //   );
-
-    console.log("Filtered Data", result);
     dispatch(setFilteredQuestions(result));
-    setTimeout(() => {
-      dispatch(setQuestionsIsLoading(false));
-    }, 1000);
-  }, [dispatch, filters, questions, subtopics]);
+  }, [dispatch, subtopicFilter, typeFilter, hiddenFilter, sortColumn, sortDirection, questions, subtopics]);
 
   // const handleRefresh = useCallback(() => {
   //   applyFilters()
   // }, [applyFilters])
 
-  // Initialize state from URL on first load
+  // Update Redux state from URL params for API calls (only when URL changes and router is ready)
   useEffect(() => {
     if (!router.isReady) return;
 
     const pageFromUrl = router.query.page
       ? parseInt(router.query.page as string, 10)
       : DEFAULT_PAGE_NUMBER;
-    if (!isNaN(pageFromUrl))
-      dispatch(setQuestionReqParams({ page_number: pageFromUrl }));
-
+    const pageSizeFromUrl = router.query.pageSize
+      ? parseInt(router.query.pageSize as string, 10)
+      : 10;
     const nameFromUrl = router.query.name as string;
-    // if (nameFromUrl) dispatch(setQuestionReqParams({ name: nameFromUrl }));
-
     const typeFromUrl = router.query.type as string;
+    const subtopicFromUrl = router.query.subtopic as string;
+    const hiddenFromUrl = router.query.hidden as string;
 
     const reqParams = {
-      name:
-        nameFromUrl && nameFromUrl?.length > 0 ? nameFromUrl : undefined,
-      page_number: !isNaN(pageFromUrl) ? pageFromUrl : undefined,
+      page_number: !isNaN(pageFromUrl) ? pageFromUrl : DEFAULT_PAGE_NUMBER,
+      page_size: !isNaN(pageSizeFromUrl) ? pageSizeFromUrl : 10,
+      name: nameFromUrl && nameFromUrl?.length > 0 ? nameFromUrl : undefined,
       type: typeFromUrl,
+      sub_topic_id: subtopicFromUrl,
+      hidden: hiddenFromUrl === "true" || hiddenFromUrl === "false" ? hiddenFromUrl : undefined,
     };
-    removeNulls(reqParams);
-    dispatch(setQuestionReqParams(reqParams));
-
-    const sortColumnFromUrl = router.query.sortColumn as string;
-    const sortDirectionFromUrl = router.query.sortDirection as "asc" | "desc";
-    // if (sortColumnFromUrl) dispatch(setQuestionTableFilters({ sortColumn: sortColumnFromUrl }))
-    // if (sortDirectionFromUrl && ["asc", "desc"].includes(sortDirectionFromUrl)) dispatch(setQuestionTableFilters({ sortDirection: sortDirectionFromUrl }))
-
-    const subtopicFilterFromUrl = router.query.subtopic as string;
-    // if (subtopicFilterFromUrl) dispatch(setQuestionTableFilters({ subtopicFilter: subtopicFilterFromUrl }))
-
-    const typeFilterFromUrl = router.query.type as string;
-    // if (typeFilterFromUrl)
-    //   dispatch(setQuestionTableFilters({ typeFilter: typeFilterFromUrl }))
-
-    const hiddenFilterFromUrl = router.query.hidden as string;
-
-    const filterParams = {
-      typeFilter: typeFilterFromUrl,
-      sortColumn: sortColumnFromUrl,
-      sortDirection:
-        sortDirectionFromUrl && ["asc", "desc"].includes(sortDirectionFromUrl)
-          ? sortDirectionFromUrl
-          : undefined,
-      subtopicFilter: subtopicFilterFromUrl,
-      hiddenFilter: hiddenFilterFromUrl === "true" || hiddenFilterFromUrl === "false" ? hiddenFilterFromUrl : undefined,
-    };
-    dispatch(setQuestionTableFilters(filterParams));
     
-    // Also set the hidden parameter in questionReqParams for API calls
-    if (hiddenFilterFromUrl === "true" || hiddenFilterFromUrl === "false") {
-      dispatch(setQuestionReqParams({ hidden: hiddenFilterFromUrl }));
-    }
+    dispatch(setQuestionReqParams(reqParams));
+  }, [router.isReady, router.query.page, router.query.pageSize, router.query.name, router.query.type, router.query.subtopic, router.query.hidden, dispatch]);
 
-    // applyFilters()
-  }, [router.isReady, router.query, dispatch]);
-
-  // Apply filters whenever dependencies change
-  // useEffect(() => {
-  //   applyFilters()
-  // }, [questions, applyFilters])
-
-  //GET LIST OF QUESTIONS
+  // Apply filters whenever questions or URL params change (only when router is ready)
   useEffect(() => {
-    console.log("Fetching questions");
+    if (!router.isReady) return;
+    // Only apply filters if we have questions to filter
+    if (questions.length > 0) {
+      applyFilters();
+    } else if (questions.length === 0) {
+      // Clear filtered results if no questions
+      dispatch(setFilteredQuestions([]));
+    }
+  }, [router.isReady, questions.length, subtopicFilter, typeFilter, hiddenFilter, sortColumn, sortDirection, subtopics.length, applyFilters, dispatch]);
+
+  //GET LIST OF QUESTIONS - triggered by URL params (only when router is ready)
+  useEffect(() => {
+    if (!router.isReady || !authContext?.token) return;
+    
+    // Create a unique key for this set of params
+    const fetchKey = `${pageNumber}-${pageSize}-${searchQuery || ''}-${subtopicFilter || ''}-${typeFilter || ''}-${hiddenFilter || ''}`;
+    
+    // Only fetch if params have actually changed
+    if (lastFetchParamsRef.current === fetchKey && hasInitialFetchRef.current) {
+      return;
+    }
+    
+    // Mark that we're about to fetch with these params
+    lastFetchParamsRef.current = fetchKey;
+    hasInitialFetchRef.current = true;
+    
+    let cancelled = false;
+    
     async function getQuestions() {
       dispatch(setQuestionsIsLoading(true));
-      const results = await handleFetchQuestions(
-        authContext?.token,
-        questionReqParams?.page_number,
-        questionReqParams?.page_size,
-        questionReqParams?.name,
-        questionReqParams?.sub_topic_id,
-        questionReqParams?.type,
-        questionReqParams?.hidden
-      );
+      
+      try {
+        const results = await handleFetchQuestions(
+          authContext.token,
+          pageNumber,
+          pageSize,
+          searchQuery || undefined,
+          subtopicFilter,
+          typeFilter,
+          hiddenFilter
+        );
 
-      if ((results as { error: string })?.error) {
-        toast({
-          title: (results as { error: string })?.error,
-          style: { background: "red", color: "white" },
-          duration: 3500,
-        });
+        if (cancelled) return;
 
-        dispatch(setQuestions([]));
-      } else {
-        dispatch(setQuestions(results.data ?? []));
+        if ((results as { error: string })?.error) {
+          toast({
+            title: (results as { error: string })?.error,
+            style: { background: "red", color: "white" },
+            duration: 3500,
+          });
+
+          dispatch(setQuestions([]));
+        } else {
+          dispatch(setQuestions(results.data ?? []));
+        }
+
+        dispatch(setQuestionAmount(results.amount ?? 0));
+      } catch (error) {
+        if (!cancelled) {
+          toast({
+            title: "Failed to fetch questions",
+            style: { background: "red", color: "white" },
+            duration: 3500,
+          });
+          dispatch(setQuestions([]));
+        }
+      } finally {
+        if (!cancelled) {
+          dispatch(setQuestionsIsLoading(false));
+        }
       }
-
-      dispatch(setQuestionAmount(results.amount ?? 0));
-      dispatch(setQuestionsIsLoading(false));
     }
 
-    getQuestions();
+    // Add a small delay to batch rapid URL changes
+    const timeoutId = setTimeout(() => {
+      getQuestions();
+    }, 100);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+    };
   }, [
-    questionReqParams?.page_number,
-    questionReqParams?.page_size,
-    questionReqParams?.name,
-    questionReqParams?.sub_topic_id,
-    questionReqParams?.type,
-    questionReqParams?.hidden,
+    router.isReady,
+    pageNumber,
+    pageSize,
+    searchQuery,
+    subtopicFilter,
+    typeFilter,
+    hiddenFilter,
     dispatch,
     authContext?.token,
   ]);
@@ -319,11 +326,11 @@ export default function QuestionsPage() {
   const handleAddNew = useCallback(() => {
     router.push({
       pathname: "/admin/topics/subtopics/questions/create",
-      query: questionReqParams?.sub_topic_id
-        ? { subtopic: questionReqParams?.sub_topic_id }
+      query: subtopicFilter
+        ? { subtopic: subtopicFilter }
         : {},
     });
-  }, [questionReqParams?.sub_topic_id, router]);
+  }, [subtopicFilter, router]);
 
   const handleEdit = useCallback(
     (id: number | string) => {
@@ -401,9 +408,7 @@ export default function QuestionsPage() {
   );
 
   const handleSearch = useDebouncedCallback((value: string) => {
-    dispatch(setQuestionReqParams({ name: value, page_number: 1 })); // triggers apply filter
-    
-    // update url
+    // Update URL - this is the single source of truth
     const query = {
       ...router.query,
       name: value || undefined,
@@ -417,10 +422,7 @@ export default function QuestionsPage() {
 
   const handleSubtopicFilterChange = useCallback(
     (value: string) => {
-      dispatch(setQuestionTableFilters({ subtopicFilter: value }));
-      dispatch(setQuestionReqParams({ page_number: 1, sub_topic_id: value })); //triggers the apply filter
-
-      // update url
+      // Update URL - this is the single source of truth
       const query = {
         ...router.query,
         subtopic: value || undefined,
@@ -431,68 +433,60 @@ export default function QuestionsPage() {
         shallow: true,
       });
     },
-    [dispatch, router]
+    [router]
   );
 
   const handleTypeFilterChange = useCallback(
     (value: string) => {
-      dispatch(setQuestionTableFilters({ typeFilter: value }));
-      dispatch(setQuestionReqParams({ page_number: 1, type: value || undefined }));
-
-      // update url
+      // Update URL - this is the single source of truth
       const query = { ...router.query, type: value || undefined, page: "1" };
       if (!value) delete query.type;
       router.push({ pathname: router.pathname, query }, undefined, {
         shallow: true,
       });
     },
-    [dispatch, router]
+    [router]
   );
 
   const handleHiddenFilterChange = useCallback(
     (value: string) => {
-      dispatch(setQuestionTableFilters({ hiddenFilter: value }));
-      dispatch(setQuestionReqParams({ page_number: 1, hidden: value || undefined }));
-
-      // update url
+      // Update URL - this is the single source of truth
       const query = { ...router.query, hidden: value || undefined, page: "1" };
       if (!value) delete query.hidden;
       router.push({ pathname: router.pathname, query }, undefined, {
         shallow: true,
       });
     },
-    [dispatch, router]
+    [router]
   );
 
   const handleSort = useCallback(
     (column: string, direction: "asc" | "desc") => {
-      dispatch(
-        setQuestionTableFilters({
-          sortColumn: column,
-          sortDirection: direction,
-        })
-      );
-
-      setTimeout(applyFilters, 800);
-
-      // router.push({
-      //   pathname: router.pathname,
-      //   query: { ...router.query, sortColumn: column, sortDirection: direction }
-      // }, undefined, { shallow: true })
+      // Update URL - this is the single source of truth
+      const query = { 
+        ...router.query, 
+        sortColumn: column, 
+        sortDirection: direction 
+      };
+      router.push({ pathname: router.pathname, query }, undefined, {
+        shallow: true,
+      });
     },
-    [dispatch, applyFilters]
+    [router]
   );
 
   const handlePageChange = useCallback(
     (page: number) => {
-      dispatch(setQuestionReqParams({ page_number: page }));
-      // router.push({
-      //   pathname: router.pathname,
-      //   query: { ...router.query, page: page.toString() }
-      // }, undefined, { shallow: true })
-      // applyFilters()
+      // Update URL - this is the single source of truth
+      const query = { 
+        ...router.query, 
+        page: page.toString() 
+      };
+      router.push({ pathname: router.pathname, query }, undefined, {
+        shallow: true,
+      });
     },
-    [dispatch]
+    [router]
   );
 
   // const getPaginatedData = () => {
@@ -519,7 +513,7 @@ export default function QuestionsPage() {
         id: "subtopic",
         label: "Subtopic",
         type: "select" as const,
-        value: filters.subtopicFilter,
+        value: subtopicFilter,
         onChange: handleSubtopicFilterChange,
         placeholder: "",
         options: [
@@ -534,7 +528,7 @@ export default function QuestionsPage() {
         id: "type",
         label: "Question Type",
         type: "select" as const,
-        value: filters.typeFilter,
+        value: typeFilter,
         onChange: handleTypeFilterChange,
         placeholder: "",
         options: [
@@ -548,7 +542,7 @@ export default function QuestionsPage() {
         id: "hidden",
         label: "Hidden Status",
         type: "select" as const,
-        value: filters.hiddenFilter,
+        value: hiddenFilter,
         onChange: handleHiddenFilterChange,
         placeholder: "",
         options: [
@@ -559,9 +553,9 @@ export default function QuestionsPage() {
       },
     ],
     [
-      filters.subtopicFilter,
-      filters.typeFilter,
-      filters.hiddenFilter,
+      subtopicFilter,
+      typeFilter,
+      hiddenFilter,
       handleSubtopicFilterChange,
       handleTypeFilterChange,
       handleHiddenFilterChange,
@@ -771,10 +765,14 @@ export default function QuestionsPage() {
     [handleSort]
   );
 
-  // const currentSortValue = useMemo(() => `${filters.sortColumn}_${filters.sortDirection}`, [filters.sortColumn, filters.sortDirection])
+  const currentSortValue = useMemo(() => {
+    if (sortColumn && sortDirection) {
+      return `${sortColumn}_${sortDirection}`;
+    }
+    return undefined;
+  }, [sortColumn, sortDirection]);
+
   const getDataComponent = useCallback(() => {
-    const currentSortValue = `${filters.sortColumn}_${filters.sortDirection}`;
-    console.log("Curr sort", currentSortValue);
 
     return (
       <DataManagementLayout
@@ -816,28 +814,35 @@ export default function QuestionsPage() {
         onRefresh={applyFilters}
         className="px-2 sm:px-4"
         defaultSort={currentSortValue}
-        defaultShowFilters={!!filters.subtopicFilter || !!filters.typeFilter || !!filters.hiddenFilter}
+        defaultShowFilters={!!subtopicFilter || !!typeFilter || !!hiddenFilter}
       >
         <DataTable
           data={getPaginatedData}
           columns={columns}
           keyExtractor={(item) => `${item.id}`}
           // onRowClick={(item) => handleViewQuestion(item.id)}
-          sortColumn={filters.sortColumn}
-          sortDirection={filters.sortDirection}
+          sortColumn={sortColumn}
+          sortDirection={sortDirection}
           onSort={handleSort}
           pagination={{
-            currentPage: questionReqParams?.page_number,
+            currentPage: pageNumber,
             totalPages: Math.max(
               1,
-              Math.ceil(totalQuestionAmt / questionReqParams.page_size)
+              Math.ceil(totalQuestionAmt / pageSize)
             ),
             totalItems: totalQuestionAmt,
-            itemsPerPage: questionReqParams.page_size,
+            itemsPerPage: pageSize,
             onPageChange: handlePageChange,
             onPageSizeChange: (pageSize: number) => {
-              dispatch(setQuestionReqParams({ page_size: pageSize, page_number: 1 }));
-              setTimeout(applyFilters, 800);
+              // Update URL - this is the single source of truth
+              const query = { 
+                ...router.query, 
+                pageSize: pageSize.toString(),
+                page: "1"
+              };
+              router.push({ pathname: router.pathname, query }, undefined, {
+                shallow: true,
+              });
             },
             pageSizeOptions: [5, 10, 20, 50, 100],
             showPageSizeSelector: true,
@@ -856,10 +861,11 @@ export default function QuestionsPage() {
   }, [
     columns,
     filterOptions,
-    filters.sortColumn,
-    filters.sortDirection,
-    filters.subtopicFilter,
-    filters.typeFilter,
+    sortColumn,
+    sortDirection,
+    subtopicFilter,
+    typeFilter,
+    hiddenFilter,
     getPaginatedData,
     handleAddNew,
     handlePageChange,
@@ -869,11 +875,47 @@ export default function QuestionsPage() {
     handleSortChange,
     handleViewQuestion,
     isLoading,
-    questionReqParams?.page_number,
-    questionReqParams.page_size,
+    pageNumber,
+    pageSize,
     sortOptions,
     totalQuestionAmt,
+    currentSortValue,
   ]);
+
+  // Show loading skeleton while router is not ready
+  if (!router.isReady) {
+    return (
+      <AdminLayout>
+        <div className="container py-6 space-y-6">
+          <div className="flex items-center justify-between">
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-10 w-32" />
+          </div>
+          <div className="space-y-4">
+            <div className="flex gap-4">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+            <div className="space-y-2">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-16 w-full" />
+              ))}
+            </div>
+            <div className="flex items-center justify-between">
+              <Skeleton className="h-4 w-32" />
+              <div className="flex gap-2">
+                <Skeleton className="h-8 w-8" />
+                <Skeleton className="h-8 w-8" />
+                <Skeleton className="h-8 w-8" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </AdminLayout>
+    );
+  }
 
   return (
     <AdminLayout>
