@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useContext, useMemo, useRef } from "react";
+import { useEffect, useState, useCallback, useContext, useMemo } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { DataManagementLayout } from "@/components/layout/DataManagementLayout";
 import { DataTable } from "@/components/data/DataTable";
@@ -24,6 +24,11 @@ import {
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Check } from "lucide-react";
 // import { Question, QuestionType } from "@/lib/types"
 import { useAuth } from "@/contexts/AuthContext";
 import { useDebouncedCallback } from "use-debounce";
@@ -86,10 +91,6 @@ export default function QuestionsPage() {
   const questions = useAppSelector(getQuestions);
   const filteredQuestions = useAppSelector(getFilteredQuestions);
   const subtopics = useAppSelector(getQuestionSubtopics);
-
-  // Track the last fetch params to prevent duplicate fetches
-  const lastFetchParamsRef = useRef<string>("");
-  const hasInitialFetchRef = useRef<boolean>(false);
 
   // URL-synced state
   // const [sortColumn, setSortColumn] = useState<string>("title")
@@ -215,18 +216,6 @@ export default function QuestionsPage() {
   //GET LIST OF QUESTIONS - triggered by URL params (only when router is ready)
   useEffect(() => {
     if (!router.isReady || !authContext?.token) return;
-    
-    // Create a unique key for this set of params
-    const fetchKey = `${pageNumber}-${pageSize}-${searchQuery || ''}-${subtopicFilter || ''}-${typeFilter || ''}-${hiddenFilter || ''}`;
-    
-    // Only fetch if params have actually changed
-    if (lastFetchParamsRef.current === fetchKey && hasInitialFetchRef.current) {
-      return;
-    }
-    
-    // Mark that we're about to fetch with these params
-    lastFetchParamsRef.current = fetchKey;
-    hasInitialFetchRef.current = true;
     
     let cancelled = false;
     
@@ -400,6 +389,160 @@ export default function QuestionsPage() {
     }, 1000);
   }, [authContext?.token, deleteData.questionId, dispatch]);
 
+  // Update question handler (for partial updates like hidden and difficulty)
+  const handleUpdateQuestion = useCallback(async (
+    questionId: string,
+    updates: { hidden?: boolean; difficultyLevel?: number }
+  ) => {
+    if (!authContext?.token) return;
+
+    try {
+      // Get current question data
+      const currentQuestion = questions.find(q => String(q.id) === String(questionId));
+      if (!currentQuestion) {
+        displayErrorMessage("Question not found");
+        return;
+      }
+
+      // Prepare update payload
+      const questionDetails = {
+        ...currentQuestion,
+        ...updates,
+      };
+
+      const rawResponse = await fetch("/api/questions", {
+        method: "PUT",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authContext.token}`,
+        },
+        body: JSON.stringify({
+          id: questionId,
+          questionDetails,
+        }),
+      });
+
+      if (!rawResponse.ok) {
+        throw new Error("Failed to update question");
+      }
+
+      const updatedQuestion = await rawResponse.json() as QuestionDetails;
+
+      // Update local state
+      dispatch(setQuestions(
+        questions.map(q => String(q.id) === String(questionId) ? updatedQuestion : q)
+      ));
+
+      displaySuccessMessage("Question updated!");
+    } catch (error) {
+      console.error("Error updating question:", error);
+      displayErrorMessage("Failed to update question");
+    }
+  }, [authContext?.token, questions, dispatch]);
+
+  // Toggle hidden status
+  const handleToggleHidden = useCallback(async (
+    questionId: string,
+    currentHidden: boolean
+  ) => {
+    await handleUpdateQuestion(questionId, { hidden: !currentHidden });
+  }, [handleUpdateQuestion]);
+
+  // Update difficulty
+  const handleUpdateDifficulty = useCallback(async (
+    questionId: string,
+    newDifficulty: number
+  ) => {
+    await handleUpdateQuestion(questionId, { difficultyLevel: newDifficulty });
+  }, [handleUpdateQuestion]);
+
+  // Update subtopics (link/unlink)
+  const handleUpdateSubtopics = useCallback(async (
+    questionId: string,
+    newSubtopicIds: string[]
+  ) => {
+    if (!authContext?.token) return;
+
+    try {
+      // Get current question
+      const currentQuestion = questions.find(q => String(q.id) === String(questionId));
+      if (!currentQuestion) {
+        displayErrorMessage("Question not found");
+        return;
+      }
+
+      const currentSubtopicIds = (currentQuestion.subTopics || []).map(st => String(st.id));
+      
+      // Find subtopics to link (new ones)
+      const toLink = newSubtopicIds.filter(id => !currentSubtopicIds.includes(id));
+      // Find subtopics to unlink (removed ones)
+      const toUnlink = currentSubtopicIds.filter(id => !newSubtopicIds.includes(id));
+
+      // Link new subtopics
+      for (const subtopicId of toLink) {
+        const response = await fetch(
+          `/api/sub-topics/${subtopicId}/question/${questionId}`,
+          {
+            method: "POST",
+            headers: {
+              Accept: "application/json",
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${authContext.token}`,
+            },
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`Failed to link subtopic ${subtopicId}`);
+        }
+      }
+
+      // Unlink removed subtopics
+      for (const subtopicId of toUnlink) {
+        const response = await fetch(
+          `/api/sub-topics/${subtopicId}/question/${questionId}`,
+          {
+            method: "DELETE",
+            headers: {
+              Accept: "application/json",
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${authContext.token}`,
+            },
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`Failed to unlink subtopic ${subtopicId}`);
+        }
+      }
+
+      // Refresh the question to get updated subtopics
+      const questionResponse = await fetch(`/api/questions/${questionId}`, {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authContext.token}`,
+        },
+      });
+
+      if (questionResponse.ok) {
+        const updatedQuestion = await questionResponse.json() as QuestionDetails;
+        
+        // Update local state
+        dispatch(setQuestions(
+          questions.map(q => String(q.id) === String(questionId) ? updatedQuestion : q)
+        ));
+      }
+
+      displaySuccessMessage("Subtopics updated!");
+    } catch (error) {
+      console.error("Error updating subtopics:", error);
+      displayErrorMessage("Failed to update subtopics");
+    }
+  }, [authContext?.token, questions, dispatch]);
+
   const handleViewQuestion = useCallback(
     (id: number | string) => {
       router.push(`/admin/topics/subtopics/questions/${id}`);
@@ -563,6 +706,184 @@ export default function QuestionsPage() {
     ]
   );
 
+  // Subtopic cell component
+  const SubtopicCell = ({ question, allSubtopics, onUpdate }: { 
+    question: QuestionDetails; 
+    allSubtopics: typeof subtopics;
+    onUpdate: (id: string, subtopicIds: string[]) => void;
+  }) => {
+    const [isEditing, setIsEditing] = useState(false);
+    const [searchQuery, setSearchQuery] = useState("");
+    const currentSubtopicIds = (question.subTopics || []).map(st => String(st.id));
+    const [selectedSubtopicIds, setSelectedSubtopicIds] = useState<string[]>(currentSubtopicIds);
+
+    // Sync with question prop
+    useEffect(() => {
+      setSelectedSubtopicIds((question.subTopics || []).map(st => String(st.id)));
+    }, [question.subTopics]);
+
+    const filteredSubtopics = allSubtopics.filter(subtopic =>
+      subtopic.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    const handleToggleSubtopic = (subtopicId: string) => {
+      setSelectedSubtopicIds(prev => {
+        if (prev.includes(subtopicId)) {
+          return prev.filter(id => id !== subtopicId);
+        } else {
+          return [...prev, subtopicId];
+        }
+      });
+    };
+
+    const handleSave = () => {
+      onUpdate(String(question.id), selectedSubtopicIds);
+      setIsEditing(false);
+    };
+
+    const handleCancel = () => {
+      setSelectedSubtopicIds(currentSubtopicIds);
+      setIsEditing(false);
+    };
+
+    return (
+      <Popover open={isEditing} onOpenChange={setIsEditing}>
+        <PopoverTrigger asChild>
+          <div 
+            className="flex flex-wrap gap-1 cursor-pointer hover:opacity-80 transition-opacity min-h-[24px]"
+            onClick={() => setIsEditing(true)}
+          >
+            {question.subTopics && question.subTopics.length > 0 ? (
+              question.subTopics.map((subtopic) => (
+                <Badge key={subtopic.id} variant="outline" className="text-xs">
+                  {getSubtopicName(String(subtopic.id))}
+                </Badge>
+              ))
+            ) : (
+              <span className="text-xs text-muted-foreground">No subtopics</span>
+            )}
+          </div>
+        </PopoverTrigger>
+        <PopoverContent className="w-80 p-0" align="start">
+          <Command>
+            <CommandInput 
+              placeholder="Search subtopics..." 
+              value={searchQuery}
+              onValueChange={setSearchQuery}
+            />
+            <CommandList>
+              <CommandEmpty>No subtopics found.</CommandEmpty>
+              <CommandGroup>
+                {filteredSubtopics.map((subtopic) => {
+                  const isSelected = selectedSubtopicIds.includes(String(subtopic.id));
+                  return (
+                    <CommandItem
+                      key={subtopic.id}
+                      onSelect={() => handleToggleSubtopic(String(subtopic.id))}
+                      className="cursor-pointer"
+                    >
+                      <div className="flex items-center justify-between w-full">
+                        <span>{subtopic.name}</span>
+                        {isSelected && <Check className="h-4 w-4 text-primary" />}
+                      </div>
+                    </CommandItem>
+                  );
+                })}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+          <div className="border-t p-2 flex items-center justify-between">
+            <div className="text-xs text-muted-foreground">
+              {selectedSubtopicIds.length} selected
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCancel}
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleSave}
+              >
+                Save
+              </Button>
+            </div>
+          </div>
+        </PopoverContent>
+      </Popover>
+    );
+  };
+
+  // Difficulty cell component (separate component to use hooks)
+  const DifficultyCell = ({ question, onUpdate }: { question: QuestionDetails; onUpdate: (id: string, difficulty: number) => void }) => {
+    const difficulty = question.difficultyLevel;
+    const [localDifficulty, setLocalDifficulty] = useState(difficulty);
+    const [isEditing, setIsEditing] = useState(false);
+    
+    let color = "bg-green-500";
+    if (difficulty > 0.3 && difficulty <= 0.6) color = "bg-yellow-500";
+    if (difficulty > 0.6) color = "bg-red-500";
+
+    // Sync local state with question prop
+    useEffect(() => {
+      setLocalDifficulty(difficulty);
+    }, [difficulty]);
+
+    const handleSliderChange = (value: number[]) => {
+      // Round to nearest 0.1 increment
+      const rounded = Math.round(value[0] * 10) / 10;
+      setLocalDifficulty(rounded);
+    };
+
+    const handleSliderCommit = (value: number[]) => {
+      // Round to nearest 0.1 increment
+      const newDifficulty = Math.round(value[0] * 10) / 10;
+      onUpdate(String(question.id), newDifficulty);
+      setIsEditing(false);
+    };
+
+    return (
+      <Popover open={isEditing} onOpenChange={setIsEditing}>
+        <PopoverTrigger asChild>
+          <div 
+            className="flex items-center cursor-pointer hover:opacity-80 transition-opacity min-w-[100px]"
+            onClick={() => setIsEditing(true)}
+          >
+            <div className={`w-3 h-3 rounded-full ${color} mr-2`}></div>
+            <span>{(localDifficulty * 10).toFixed(1)}/10</span>
+          </div>
+        </PopoverTrigger>
+        <PopoverContent className="w-64" align="start">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label>Difficulty: {(localDifficulty * 10).toFixed(1)}/10</Label>
+              <span className="text-sm text-muted-foreground">
+                {localDifficulty <= 0.3 ? "Easy" : localDifficulty <= 0.6 ? "Medium" : "Hard"}
+              </span>
+            </div>
+            <Slider
+              value={[localDifficulty]}
+              onValueChange={handleSliderChange}
+              onValueCommit={handleSliderCommit}
+              min={0}
+              max={1}
+              step={0.1}
+              className="w-full"
+            />
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>0</span>
+              <span>0.5</span>
+              <span>1.0</span>
+            </div>
+          </div>
+        </PopoverContent>
+      </Popover>
+    );
+  };
+
   const columns = useMemo(
     () => [
       {
@@ -572,15 +893,11 @@ export default function QuestionsPage() {
           const isHidden = typeof question.hidden === 'boolean' ? question.hidden : false;
           return (
             <div className="flex items-center justify-center">
-              {isHidden ? (
-                <Badge variant="destructive" className="text-xs">
-                  Hidden
-                </Badge>
-              ) : (
-                <Badge variant="outline" className="text-xs text-muted-foreground">
-                  Visible
-                </Badge>
-              )}
+              <Switch
+                checked={isHidden}
+                onCheckedChange={() => handleToggleHidden(String(question.id), isHidden)}
+                className="cursor-pointer"
+              />
             </div>
           );
         },
@@ -623,35 +940,20 @@ export default function QuestionsPage() {
         id: "subtopic",
         header: "Subtopic",
         cell: (question: QuestionDetails) => (
-          <>
-            {question.subTopics.map((subtopic) => (
-              <>
-                <span key={subtopic.id}>
-                  {getSubtopicName(`${subtopic.id}`)}
-                </span>
-                <br />
-              </>
-            ))}
-          </>
+          <SubtopicCell 
+            question={question} 
+            allSubtopics={subtopics}
+            onUpdate={handleUpdateSubtopics}
+          />
         ),
         sortable: true,
       },
       {
         id: "difficultyLevel",
         header: "Difficulty",
-        cell: (question: QuestionDetails) => {
-          const difficulty = question.difficultyLevel;
-          let color = "bg-green-500";
-          if (difficulty > 0.3 && difficulty <= 0.6) color = "bg-yellow-500";
-          if (difficulty > 0.6) color = "bg-red-500";
-
-          return (
-            <div className="flex items-center">
-              <div className={`w-3 h-3 rounded-full ${color} mr-2`}></div>
-              <span>{(difficulty * 10).toFixed(1)}/10</span>
-            </div>
-          );
-        },
+        cell: (question: QuestionDetails) => (
+          <DifficultyCell question={question} onUpdate={handleUpdateDifficulty} />
+        ),
         sortable: true,
       },
       {
@@ -736,7 +1038,7 @@ export default function QuestionsPage() {
         ),
       },
     ],
-    [getSubtopicName, handleDeleteClick, handleEdit, handleDuplicate, handleViewQuestion]
+    [getSubtopicName, handleDeleteClick, handleEdit, handleDuplicate, handleViewQuestion, handleToggleHidden, handleUpdateDifficulty, handleUpdateSubtopics, subtopics]
   );
 
   const sortOptions = useMemo(
