@@ -21,7 +21,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { X, Plus, ArrowLeft, Trash } from "lucide-react";
+import { X, Plus, ArrowLeft, Trash, ArrowRight } from "lucide-react";
 import { QuestionFormData, QuestionType } from "@/lib/types";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
@@ -48,7 +48,7 @@ import {
   displayErrorMessage,
   displaySuccessMessage,
 } from "@/services/displayMessages";
-import { handleFetchQuestionById } from "@/services/questions/questionsRequest";
+import { handleFetchQuestionById, handleFetchNextQuestion } from "@/services/questions/questionsRequest";
 import { useAuth } from "@/contexts/AuthContext";
 import { MediaPicker } from "@/components/data/MediaPicker";
 
@@ -78,6 +78,15 @@ export default function UpdateQuestionPage() {
   const [hasLoadedInitialData, setHasLoadedInitialData] = useState(false);
   const [returnTo, setReturnTo] = useState<string | null>(null);
   const contentTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const [nextHiddenFilter, setNextHiddenFilter] = useState<string | undefined>(undefined);
+  const [nextTypeFilter, setNextTypeFilter] = useState<string | undefined>(undefined);
+  const [isLoadingNext, setIsLoadingNext] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Set mounted state to prevent hydration mismatch
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Monitor form data changes for debugging
   useEffect(() => {
@@ -121,6 +130,8 @@ export default function UpdateQuestionPage() {
       
       // Reset the loaded flag when questionId changes
       setHasLoadedInitialData(false);
+      // Reset loading state when questionId changes
+      setIsLoadingNext(false);
       
       // Set the ID in form data
       dispatch(
@@ -924,14 +935,23 @@ export default function UpdateQuestionPage() {
         else {
           dispatch(resetQuestionPageSlice());
           displaySuccessMessage(`Question ${isDuplicate ? 'Created' : 'Updated'}!`);
-          setTimeout(() => {
-            // Navigate back to the previous page if available, otherwise go to questions list
-            if (returnTo) {
-              router.push(returnTo);
-            } else {
-              router.back();
-            }
-          }, 1500);
+          // For duplicates (creates), navigate back after a delay
+          // For updates, keep the user on the edit page
+          if (isDuplicate) {
+            setTimeout(() => {
+              // Navigate back to the previous page if available, otherwise go to questions list
+              if (returnTo) {
+                router.push(returnTo);
+              } else {
+                router.back();
+              }
+            }, 1500);
+          }
+          // For updates, reload the question data to reflect changes
+          if (!isDuplicate && data.id) {
+            // Reset the loaded flag to reload the question data
+            setHasLoadedInitialData(false);
+          }
         }
       } catch (e) {
         console.log("On Submit Error", e);
@@ -959,6 +979,51 @@ export default function UpdateQuestionPage() {
     ]
   );
 
+  const handleNextQuestion = useCallback(async () => {
+    if (!authContext?.token || !router.query.questionId) return;
+    
+    setIsLoadingNext(true);
+    try {
+      const currentQuestionId = String(router.query.questionId);
+      const hidden = nextHiddenFilter !== undefined ? nextHiddenFilter === "true" : undefined;
+      const type = nextTypeFilter || undefined;
+
+      const result = await handleFetchNextQuestion(
+        authContext.token,
+        currentQuestionId,
+        hidden,
+        type
+      );
+
+      if (result.error) {
+        displayErrorMessage("Failed to fetch next question", result.error);
+        setIsLoadingNext(false);
+        return;
+      }
+
+      if (result.nextId) {
+        // Reset loading state before navigation
+        setIsLoadingNext(false);
+        // Navigate to the next question's edit page, preserving returnTo if it exists
+        const query: Record<string, string> = {};
+        if (returnTo) {
+          query.returnTo = returnTo;
+        }
+        router.push({
+          pathname: `/admin/topics/subtopics/questions/edit/${result.nextId}`,
+          query,
+        });
+      } else {
+        displayErrorMessage("No next question found", "There are no more questions matching your filters.");
+        setIsLoadingNext(false);
+      }
+    } catch (error) {
+      console.error("Error fetching next question:", error);
+      displayErrorMessage("Failed to fetch next question");
+      setIsLoadingNext(false);
+    }
+  }, [authContext?.token, router, nextHiddenFilter, nextTypeFilter, returnTo]);
+
   const getSubtopicName = useCallback(
     (id: string) => subtopics.find((s) => s.id === id)?.name || "Unknown",
     [subtopics]
@@ -985,10 +1050,64 @@ export default function UpdateQuestionPage() {
             }}>
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <h1 className="text-2xl font-bold">Update New Question</h1>
+            <h1 className="text-2xl font-bold">
+              {isMounted && router.isReady && router.query.duplicate === 'true' 
+                ? 'Create Question' 
+                : isMounted && router.isReady && router.query.questionId 
+                  ? 'Update Question' 
+                  : 'Question'}
+            </h1>
           </div>
 
           <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2 border-r pr-2 mr-2">
+              <div className="flex items-center space-x-2">
+                <Label htmlFor="next-hidden" className="text-sm text-muted-foreground whitespace-nowrap">
+                  Hidden:
+                </Label>
+                <Select
+                  value={nextHiddenFilter || "all"}
+                  onValueChange={(value) => setNextHiddenFilter(value === "all" ? undefined : value)}
+                >
+                  <SelectTrigger id="next-hidden" className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="true">Hidden</SelectItem>
+                    <SelectItem value="false">Visible</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Label htmlFor="next-type" className="text-sm text-muted-foreground whitespace-nowrap">
+                  Type:
+                </Label>
+                <Select
+                  value={nextTypeFilter || "all"}
+                  onValueChange={(value) => setNextTypeFilter(value === "all" ? undefined : value)}
+                >
+                  <SelectTrigger id="next-type" className="w-40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Types</SelectItem>
+                    <SelectItem value={QuestionType.MULTIPLE_CHOICE}>Multiple Choice</SelectItem>
+                    <SelectItem value={QuestionType.TRUE_FALSE}>True/False</SelectItem>
+                    <SelectItem value={QuestionType.SHORT_ANSWER}>Short Answer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                variant="outline"
+                onClick={handleNextQuestion}
+                disabled={isLoadingNext}
+                className="whitespace-nowrap"
+              >
+                <ArrowRight className="h-4 w-4 mr-2" />
+                {isLoadingNext ? "Loading..." : "Next"}
+              </Button>
+            </div>
             <Button variant="outline" onClick={() => {
               if (returnTo) {
                 router.push(returnTo);

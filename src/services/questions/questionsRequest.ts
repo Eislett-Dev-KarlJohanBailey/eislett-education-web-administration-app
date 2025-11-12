@@ -124,4 +124,50 @@ async function handleDeleteQuestion(
   }
 }
 
-export { handleFetchQuestionById, handleFetchQuestions, handleDeleteQuestion };
+async function handleFetchNextQuestion(
+  token: string,
+  current_question_id: string,
+  hidden?: boolean,
+  type?: string
+): Promise<{ nextId: string | null; error?: string }> {
+  try {
+    const params: Record<string, string> = {};
+    if (hidden !== undefined) {
+      params.hidden = String(hidden);
+    }
+    if (type !== undefined) {
+      params.type = type;
+    }
+
+    removeNulls(params);
+
+    const queryString = formatGetReqJson(params);
+    const url = `/api/questions/${current_question_id}/next${queryString ? `?${queryString}` : ""}`;
+
+    const rawResponse = await fetch(url, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!rawResponse.ok) {
+      throw new Error("Failed to fetch next question");
+    }
+
+    const response = (await rawResponse.json()) as { nextId: string | null };
+    return response;
+  } catch (e) {
+    toast({
+      title: "Error fetching next question",
+      style: { background: "red", color: "white" },
+      duration: 3500,
+    });
+    console.log("Questions error", e);
+    return { nextId: null, error: "Failed to fetch next question" };
+  }
+}
+
+export { handleFetchQuestionById, handleFetchQuestions, handleDeleteQuestion, handleFetchNextQuestion };
