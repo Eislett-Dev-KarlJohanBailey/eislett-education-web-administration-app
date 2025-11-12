@@ -933,11 +933,13 @@ export default function UpdateQuestionPage() {
               : "Failed to Link questions"
           );
         else {
-          dispatch(resetQuestionPageSlice());
           displaySuccessMessage(`Question ${isDuplicate ? 'Created' : 'Updated'}!`);
+          setIsSubmitting(false);
+          
           // For duplicates (creates), navigate back after a delay
-          // For updates, keep the user on the edit page
+          // For updates, keep the user on the edit page and update form data from response
           if (isDuplicate) {
+            dispatch(resetQuestionPageSlice());
             setTimeout(() => {
               // Navigate back to the previous page if available, otherwise go to questions list
               if (returnTo) {
@@ -946,16 +948,61 @@ export default function UpdateQuestionPage() {
                 router.back();
               }
             }, 1500);
-          }
-          // For updates, reload the question data to reflect changes
-          if (!isDuplicate && data.id) {
-            // Reset the loaded flag to reload the question data
-            setHasLoadedInitialData(false);
+          } else {
+            // For updates, update the form data directly from the response without resetting
+            // This prevents the infinite loading loop
+            if (data.id) {
+              // Update form data from the response
+              dispatch(setQuestionFormData({ field: 'title', value: data.title }));
+              dispatch(setQuestionFormData({ field: 'content', value: data.content }));
+              dispatch(setQuestionFormData({ field: 'description', value: data.description || '' }));
+              dispatch(setQuestionFormData({ field: 'tags', value: data.tags || [] }));
+              dispatch(setQuestionFormData({ field: 'totalPotentialMarks', value: data.totalPotentialMarks }));
+              dispatch(setQuestionFormData({ field: 'difficultyLevel', value: data.difficultyLevel }));
+              dispatch(setQuestionFormData({ field: 'type', value: data.type }));
+              dispatch(setQuestionFormData({ field: 'explanation', value: data.explanation || '' }));
+              dispatch(setQuestionFormData({ field: 'hidden', value: typeof data.hidden === 'boolean' ? data.hidden : false }));
+              
+              // Update options based on type
+              if (data.type === QuestionType.TRUE_FALSE) {
+                dispatch(setQuestionFormData({ 
+                  field: 'multipleChoiceOptions', 
+                  value: [
+                    { id: 1, content: "True", isCorrect: data.isTrue },
+                    { id: 2, content: "False", isCorrect: !data.isTrue },
+                  ]
+                }));
+              } else if (data.type === QuestionType.MULTIPLE_CHOICE) {
+                dispatch(setQuestionFormData({ 
+                  field: 'multipleChoiceOptions', 
+                  value: (data.multipleChoiceOptions || []).map((option, index) => ({
+                    ...option,
+                    id: option.id || (index + 1)
+                  }))
+                }));
+              } else if (data.type === QuestionType.SHORT_ANSWER) {
+                dispatch(setQuestionFormData({ 
+                  field: 'shortAnswers', 
+                  value: (data.shortAnswers || []).map((answer) => ({
+                    content: answer.content || "",
+                    marks: answer.marks || 1,
+                    explanation: answer.explanation || "",
+                  }))
+                }));
+              }
+              
+              // Update subtopics
+              if (data.subTopics) {
+                const subtopicIds = data.subTopics.map((st) => String(st.id));
+                dispatch(setAllQuestionFormSubtopics(subtopicIds));
+              }
+            }
           }
         }
       } catch (e) {
         console.log("On Submit Error", e);
         displayErrorMessage("Failed to submit!");
+        setIsSubmitting(false);
       }
     },
     [
@@ -1685,6 +1732,18 @@ export default function UpdateQuestionPage() {
                         ))
                       )}
                     </div>
+                    
+                    {formData.explanation && (
+                      <div className="mt-4 pt-4 border-t">
+                        <p className="text-sm font-medium text-muted-foreground mb-2">
+                          Explanation:
+                        </p>
+                        <MarkdownRenderer
+                          content={formData.explanation}
+                          className="text-sm"
+                        />
+                      </div>
+                    )}
                   </div>
                 </TabsContent>
                 <TabsContent
