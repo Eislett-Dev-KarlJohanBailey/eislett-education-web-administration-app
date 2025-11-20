@@ -17,7 +17,8 @@ import {
   BookText,
   FileQuestion,
   ChevronDown,
-  Map
+  Map,
+  ClipboardList
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
@@ -78,6 +79,11 @@ export function AdminSidebar({ isOpen, onOpenChange }: AdminSidebarProps) {
           href: "/admin/topics/subtopics/questions"
         }
       ]
+    },
+    {
+      title: "Question Plans",
+      icon: ClipboardList,
+      href: "/admin/question-plans"
     },
     {
       title: "Countries",

@@ -16,11 +16,16 @@ export function AdminHeader({ onMenuClick }: AdminHeaderProps) {
     if (path === "/admin") return "Dashboard"
     if (path.includes("/admin/settings")) return "Settings"
     if (path.includes("/admin/users")) return "Users"
+    if (path.includes("/admin/question-plans")) return "Question Plans"
     
     // Extract the last segment of the path and capitalize it
     const segments = path.split("/")
     const lastSegment = segments[segments.length - 1]
-    return lastSegment.charAt(0).toUpperCase() + lastSegment.slice(1)
+    // Handle hyphenated paths like "question-plans" -> "Question Plans"
+    return lastSegment
+      .split("-")
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ")
   }
 
   return (
