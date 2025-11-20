@@ -6,6 +6,7 @@ import { LOCAL_STORAGE_KEYS } from "../constants/localStorageKeys";
 import { useAppDispatch, useAppSelector } from "@/store/hook";
 import { getAuthUserDetails, setAuthUserDetails, setAuthToken } from "@/store/auth-slice";
 import { AuthUserDetails } from "@/models/Auth/authUserDetails";
+import { handleFetchCurrentUser } from "@/services/administration/administrationRequest";
 
 const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [token, setToken] = useLocalStorage(LOCAL_STORAGE_KEYS.AUTH, undefined); //useState<string | undefined>(undefined);
@@ -22,6 +23,24 @@ const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   useEffect(() => {
     dispatch(setAuthToken(token))
   }, [dispatch, token])
+
+  // Fetch user details when token is available
+  useEffect(() => {
+    const fetchUserDetails = async () => {
+      if (token && !userDetails) {
+        try {
+          const response = await handleFetchCurrentUser(token);
+          if (response.data) {
+            dispatch(setAuthUserDetails(response.data));
+          }
+        } catch (error) {
+          console.error("Error fetching user details:", error);
+        }
+      }
+    };
+
+    fetchUserDetails();
+  }, [token, userDetails, dispatch]);
 
 
   return (

@@ -13,7 +13,7 @@ async function POST(req: NextApiRequest, res: NextApiResponse) {
       .json({ error: "Too many requests, please try again later." });
   }
 
-  console.log("POST /api/students/login (App Router)");
+  console.log("POST /api/administrators/login (App Router)");
 
   const email = await req.body?.email;
   const password = await req.body?.password;
@@ -29,13 +29,13 @@ async function POST(req: NextApiRequest, res: NextApiResponse) {
   // Only allow POST requests
   if (req.method !== "POST") {
     // --- Handle Other Methods ---
-    console.log(`Method ${req.method} Not Allowed for /api/students/login`);
+    console.log(`Method ${req.method} Not Allowed for /api/administrators/login`);
     res.setHeader("Allow", ["POST"]);
     return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 
   try {
-    const route = "students/login";
+    const route = "administrators/login";
     const apiKey = process.env.API_KEY;
     const nodeServer = process.env.SERVER_BASE_URL;
 
@@ -72,3 +72,4 @@ export const config = {
 };
 
 export default POST;
+

@@ -1,5 +1,5 @@
 
-import { useState } from "react"
+import { useState, useContext } from "react"
 import Link from "next/link"
 import { useRouter } from "next/router"
 import { cn } from "@/lib/utils"
@@ -21,6 +21,9 @@ import {
   ClipboardList
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useAuth } from "@/contexts/AuthContext"
+import { AuthUserDetails } from "@/models/Auth/authUserDetails"
+import { useResources } from "@/hooks/use-resources"
 
 interface AdminSidebarProps {
   isOpen: boolean
@@ -29,6 +32,7 @@ interface AdminSidebarProps {
 
 export function AdminSidebar({ isOpen, onOpenChange }: AdminSidebarProps) {
   const router = useRouter()
+  const { hasResource, isSuperAdmin } = useResources()
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     topics: router.pathname.includes("/admin/topics")
   })
@@ -43,69 +47,115 @@ export function AdminSidebar({ isOpen, onOpenChange }: AdminSidebarProps) {
   const isActive = (path: string) => router.pathname === path
   const isInPath = (path: string) => router.pathname.startsWith(path)
 
-  const menuItems = [
+  // Map menu items to resources
+  const allMenuItems = [
     {
       title: "Dashboard",
       icon: LayoutDashboard,
-      href: "/admin"
+      href: "/admin",
+      resource: null // Always visible
     },
     {
       title: "Subjects",
       icon: BookOpen,
-      href: "/admin/subjects"
+      href: "/admin/subjects",
+      resource: null // Always visible (or add a resource if needed)
     },
     {
       title: "Courses",
       icon: BookText,
-      href: "/admin/courses"
+      href: "/admin/courses",
+      resource: null // Always visible (or add a resource if needed)
     },
     {
       title: "Roadmaps",
       icon: Map,
-      href: "/admin/roadmaps"
+      href: "/admin/roadmaps",
+      resource: "roadmaps"
     },
     {
       title: "Topics",
       icon: Layers,
       href: "/admin/topics",
+      resource: null, // Always visible (or add a resource if needed)
       submenu: [
         {
           title: "Subtopics",
-          href: "/admin/topics/subtopics"
+          href: "/admin/topics/subtopics",
+          resource: null
         },
         {
           title: "Questions",
           icon: FileQuestion,
-          href: "/admin/topics/subtopics/questions"
+          href: "/admin/topics/subtopics/questions",
+          resource: "questions"
         }
       ]
     },
     {
       title: "Question Plans",
       icon: ClipboardList,
-      href: "/admin/question-plans"
+      href: "/admin/question-plans",
+      resource: "questions"
     },
     {
       title: "Countries",
       icon: Globe,
-      href: "/admin/countries"
+      href: "/admin/countries",
+      resource: null // Always visible (or add a resource if needed)
     },
     {
       title: "Schools",
       icon: Building,
-      href: "/admin/schools"
+      href: "/admin/schools",
+      resource: null // Always visible (or add a resource if needed)
     },
     {
       title: "Users",
       icon: Users,
-      href: "/admin/users"
+      href: "/admin/users",
+      resource: "students" // Using students resource for users
     },
     {
       title: "Settings",
       icon: Settings,
-      href: "/admin/settings"
+      href: "/admin/settings",
+      resource: null // Always visible (or add a resource if needed)
     }
   ]
+
+  // Filter menu items based on resources
+  const menuItems = allMenuItems.filter(item => {
+    // Always show if no resource required
+    if (!item.resource) return true;
+    
+    // Super admin sees everything
+    if (isSuperAdmin) return true;
+    
+    // Check if user has the required resource
+    return hasResource(item.resource);
+  }).map(item => {
+    // Filter submenu items if they exist
+    if (item.submenu) {
+      const filteredSubmenu = item.submenu.filter(subitem => {
+        if (!subitem.resource) return true;
+        if (isSuperAdmin) return true;
+        return hasResource(subitem.resource);
+      });
+      
+      return {
+        ...item,
+        submenu: filteredSubmenu
+      };
+    }
+    return item;
+  }).filter(item => {
+    // Remove parent items if they have submenu but all submenu items were filtered out
+    if (item.submenu && item.submenu.length === 0) {
+      return false;
+    }
+    return true;
+  })
 
   return (
     <>

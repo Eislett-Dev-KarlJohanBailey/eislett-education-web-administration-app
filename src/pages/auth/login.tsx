@@ -14,6 +14,7 @@ import { AuthResponse } from "@/models/Auth/authResponse";
 import { Toaster } from "@/components/ui/toaster";
 import { useAppDispatch } from "@/store/hook";
 import { useAuth } from "@/contexts/AuthContext";
+import { handleFetchCurrentUser } from "@/services/administration/administrationRequest";
 
 export default function LoginPage() {
   
@@ -63,7 +64,7 @@ export default function LoginPage() {
       const params: AuthReqParams = { email: email, password: password }
       console.log('Params', params)
       
-      const rawResponse = await fetch('/api/students/login',
+      const rawResponse = await fetch('/api/administrators/login',
         {
           method: 'POST',
           headers: {
@@ -81,6 +82,17 @@ export default function LoginPage() {
       authContext?.setToken(data?.accessToken ?? undefined)
       
       if (data?.accessToken) {
+        // Fetch user details after successful login
+        try {
+          const userResponse = await handleFetchCurrentUser(data.accessToken);
+          if (userResponse.data) {
+            authContext?.setUserDetails(userResponse.data);
+          }
+        } catch (error) {
+          console.error("Error fetching user details:", error);
+          // Continue with login even if user details fetch fails
+        }
+        
         toast({ title: 'Redirecting...', style: { background: 'green', color: 'white' }, duration: 1500 })
         router.push("/admin");
       }
