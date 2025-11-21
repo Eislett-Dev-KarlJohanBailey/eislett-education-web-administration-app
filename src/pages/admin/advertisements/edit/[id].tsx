@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AdPlacement, AdvertismentTargetingRule, Advertisement } from "@/models/advertisements/advertisement";
 import { Badge } from "@/components/ui/badge";
 import { X } from "lucide-react";
@@ -299,17 +300,21 @@ export default function EditAdvertisementPage() {
               <Label>Targeting Rules</Label>
               <div className="space-y-2 border p-4 rounded-lg">
                 <div className="grid grid-cols-4 gap-2">
-                  <select
+                  <Select
                     value={newRule.type}
-                    onChange={(e) => setNewRule({ ...newRule, type: e.target.value as AdvertismentTargetingRule["type"] })}
-                    className="px-3 py-2 border rounded-md"
+                    onValueChange={(value) => setNewRule({ ...newRule, type: value as AdvertismentTargetingRule["type"] })}
                   >
-                    {RULE_TYPES.map((type) => (
-                      <option key={type} value={type}>
-                        {type}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {RULE_TYPES.map((type) => (
+                        <SelectItem key={type} value={type}>
+                          {type}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <Input
                     placeholder="Value"
                     value={newRule.value || ""}
