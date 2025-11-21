@@ -19,7 +19,8 @@ import {
   ChevronDown,
   Map,
   ClipboardList,
-  Megaphone
+  Megaphone,
+  Flag
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/contexts/AuthContext"
@@ -103,6 +104,12 @@ export function AdminSidebar({ isOpen, onOpenChange }: AdminSidebarProps) {
       title: "Advertisements",
       icon: Megaphone,
       href: "/admin/advertisements",
+      resource: null // Always visible (or add a resource if needed)
+    },
+    {
+      title: "Feature Flags",
+      icon: Flag,
+      href: "/admin/feature-flags",
       resource: null // Always visible (or add a resource if needed)
     },
     {
