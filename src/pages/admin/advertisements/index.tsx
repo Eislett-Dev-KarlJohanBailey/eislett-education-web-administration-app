@@ -8,7 +8,8 @@ import { useRouter } from "next/router";
 import { useAuth } from "@/contexts/AuthContext";
 import { DEFAULT_PAGE_NUMBER } from "@/constants/tablePageSizes";
 import { toast } from "@/hooks/use-toast";
-import { handleFetchAdvertisements, Advertisement } from "@/services/advertisements/advertisementsRequest";
+import { handleFetchAdvertisements } from "@/services/advertisements/advertisementsRequest";
+import { Advertisement } from "@/models/advertisements/advertisement";
 import { Badge } from "@/components/ui/badge";
 import { DeleteConfirmationDialog } from "@/components/data/DeleteConfirmationDialog";
 

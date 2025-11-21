@@ -16,7 +16,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { handleFetchSubTopics } from "@/services/subtopics/subTopicsRequest";
 import { SubTopicDetails } from "@/models/subTopic/subTopicDetails";
-import { SubtopicCombobox } from "./components/SubtopicCombobox";
+import { SubtopicCombobox } from "@/components/data/SubtopicCombobox";
 
 export default function CreateQuestionPlanPage() {
   const router = useRouter();
