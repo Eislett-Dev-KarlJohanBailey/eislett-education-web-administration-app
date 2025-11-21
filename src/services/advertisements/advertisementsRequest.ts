@@ -187,3 +187,37 @@ export async function handleUpdateAdvertisement(
   }
 }
 
+export async function handleDeleteAdvertisement(
+  token: string,
+  advertisementId: string
+): Promise<{ deleted?: boolean; error?: string }> {
+  try {
+    const rawResponse = await fetch(
+      `/api/advertisements/${advertisementId}`,
+      {
+        method: "DELETE",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    if (!rawResponse.ok) {
+      const errorData = await rawResponse.json().catch(() => ({}));
+      throw new Error(errorData.error || "Failed to delete advertisement");
+    }
+
+    return { deleted: true };
+  } catch (e: any) {
+    toast({
+      title: e.message || "Error deleting advertisement",
+      style: { background: "red", color: "white" },
+      duration: 3500,
+    });
+    console.log("Advertisements error", e);
+    return { error: e.message || "Failed to delete advertisement" };
+  }
+}
+

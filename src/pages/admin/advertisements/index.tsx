@@ -8,7 +8,7 @@ import { useRouter } from "next/router";
 import { useAuth } from "@/contexts/AuthContext";
 import { DEFAULT_PAGE_NUMBER } from "@/constants/tablePageSizes";
 import { toast } from "@/hooks/use-toast";
-import { handleFetchAdvertisements } from "@/services/advertisements/advertisementsRequest";
+import { handleFetchAdvertisements, handleDeleteAdvertisement } from "@/services/advertisements/advertisementsRequest";
 import { Advertisement } from "@/models/advertisements/advertisement";
 import { Badge } from "@/components/ui/badge";
 import { DeleteConfirmationDialog } from "@/components/data/DeleteConfirmationDialog";
@@ -225,13 +225,38 @@ export default function AdvertisementsPage() {
           open={adToDelete !== null}
           onOpenChange={(open) => !open && setAdToDelete(null)}
           onConfirm={async () => {
-            // TODO: Implement delete functionality
-            toast({
-              title: "Delete functionality not yet implemented",
-              style: { background: "orange", color: "white" },
-              duration: 3500,
-            });
-            setAdToDelete(null);
+            if (!adToDelete || !authContext?.token) {
+              setAdToDelete(null);
+              return;
+            }
+
+            try {
+              const result = await handleDeleteAdvertisement(authContext.token, adToDelete);
+              
+              if (result.deleted) {
+                toast({
+                  title: "Advertisement deleted successfully",
+                  style: { background: "green", color: "white" },
+                  duration: 3500,
+                });
+                await fetchAdvertisements();
+              } else {
+                toast({
+                  title: result.error || "Failed to delete advertisement",
+                  style: { background: "red", color: "white" },
+                  duration: 3500,
+                });
+              }
+            } catch (error) {
+              console.error("Error deleting advertisement:", error);
+              toast({
+                title: "Error deleting advertisement",
+                style: { background: "red", color: "white" },
+                duration: 3500,
+              });
+            } finally {
+              setAdToDelete(null);
+            }
           }}
           title="Delete Advertisement"
           description="Are you sure you want to delete this advertisement? This action cannot be undone."
