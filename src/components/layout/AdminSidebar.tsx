@@ -18,7 +18,8 @@ import {
   FileQuestion,
   ChevronDown,
   Map,
-  ClipboardList
+  ClipboardList,
+  Megaphone
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/contexts/AuthContext"
@@ -97,6 +98,12 @@ export function AdminSidebar({ isOpen, onOpenChange }: AdminSidebarProps) {
       icon: ClipboardList,
       href: "/admin/question-plans",
       resource: "questions"
+    },
+    {
+      title: "Advertisements",
+      icon: Megaphone,
+      href: "/admin/advertisements",
+      resource: null // Always visible (or add a resource if needed)
     },
     {
       title: "Countries",
