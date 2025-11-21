@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AdPlacement, AdvertismentTargetingRule, Advertisement } from "@/models/advertisements/advertisement";
 import { Badge } from "@/components/ui/badge";
 import { X } from "lucide-react";
+import { MediaPicker } from "@/components/data/MediaPicker";
 
 const AD_PLACEMENTS: AdPlacement[] = [
   "strand_rhs",
@@ -130,6 +131,35 @@ export default function EditAdvertisementPage() {
     setRules((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
+  // Handle media selection from MediaPicker
+  const handleMediaSelect = useCallback((markdown: string) => {
+    // Extract URL from markdown format: ![name](url "name")
+    const urlMatch = markdown.match(/!\[.*?\]\((.*?)(?:\s+"[^"]*")?\)/);
+    if (urlMatch && urlMatch[1]) {
+      const url = urlMatch[1];
+      handleFormChange("mediaUrl", url);
+      
+      // Try to detect media type from URL extension
+      const urlLower = url.toLowerCase();
+      if (urlLower.includes('.png')) {
+        handleFormChange("mediaType", "image/png");
+      } else if (urlLower.includes('.jpg') || urlLower.includes('.jpeg')) {
+        handleFormChange("mediaType", "image/jpeg");
+      } else if (urlLower.includes('.gif')) {
+        handleFormChange("mediaType", "image/gif");
+      } else if (urlLower.includes('.webp')) {
+        handleFormChange("mediaType", "image/webp");
+      } else if (urlLower.includes('.svg')) {
+        handleFormChange("mediaType", "image/svg+xml");
+      }
+      
+      toast({
+        title: "Media URL updated",
+        description: "Media URL has been set from the selected image",
+      });
+    }
+  }, [handleFormChange]);
+
   const handleFormSubmit = useCallback(async () => {
     if (!authContext?.token || !id) {
       setIsSubmitting(false);
@@ -231,6 +261,29 @@ export default function EditAdvertisementPage() {
                 </div>
               </div>
             )}
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="mediaUrl">Media URL</Label>
+                <MediaPicker onInsert={handleMediaSelect} />
+              </div>
+              <Input
+                id="mediaUrl"
+                value={formData.mediaUrl || ""}
+                onChange={(e) => handleFormChange("mediaUrl", e.target.value)}
+                placeholder="Enter media URL or use the upload button"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="mediaType">Media Type</Label>
+              <Input
+                id="mediaType"
+                value={formData.mediaType || ""}
+                onChange={(e) => handleFormChange("mediaType", e.target.value)}
+                placeholder="e.g., image/png, image/jpeg"
+              />
+            </div>
 
             <div className="space-y-2">
               <Label htmlFor="title">Title</Label>
