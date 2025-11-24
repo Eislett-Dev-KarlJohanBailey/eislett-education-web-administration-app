@@ -17,6 +17,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { handleFetchSubTopics } from "@/services/subtopics/subTopicsRequest";
 import { SubTopicDetails } from "@/models/subTopic/subTopicDetails";
 import { SubtopicCombobox } from "@/components/data/SubtopicCombobox";
+import { handleFetchQuestionPlanPresets, QuestionPlanPreset } from "@/services/questionPlans/questionPlansRequest";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function CreateQuestionPlanPage() {
   const router = useRouter();
@@ -24,6 +26,8 @@ export default function CreateQuestionPlanPage() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [subtopics, setSubtopics] = useState<SubTopicDetails[]>([]);
+  const [presets, setPresets] = useState<QuestionPlanPreset[]>([]);
+  const [selectedPresetId, setSelectedPresetId] = useState<string>("");
   const [formData, setFormData] = useState<CreateQuestionPlanRequest>({
     subTopicId: "",
     prompt: "",
@@ -63,6 +67,54 @@ export default function CreateQuestionPlanPage() {
 
     fetchSubtopics();
   }, [authContext?.token]);
+
+  // Fetch presets
+  useEffect(() => {
+    if (!authContext?.token) return;
+
+    const fetchPresets = async () => {
+      try {
+        const response = await handleFetchQuestionPlanPresets(authContext.token);
+        if (response.error) {
+          console.error("Error fetching presets:", response.error);
+          setPresets([]);
+        } else {
+          setPresets(response.data ?? []);
+        }
+      } catch (error) {
+        console.error("Error fetching presets:", error);
+        setPresets([]);
+      }
+    };
+
+    fetchPresets();
+  }, [authContext?.token]);
+
+  // Handle preset selection
+  const handlePresetSelect = useCallback((presetId: string) => {
+    setSelectedPresetId(presetId);
+    const selectedPreset = presets.find((p) => p.id === presetId);
+    if (selectedPreset) {
+      // Apply vector stores if they exist
+      if (selectedPreset.vectorStores) {
+        handleFormChange("vectorStores", selectedPreset.vectorStores);
+      }
+      // Apply prompt if it exists
+      if (selectedPreset.prompt) {
+        handleFormChange("prompt", selectedPreset.prompt);
+      }
+      
+      const appliedItems = [];
+      if (selectedPreset.vectorStores) appliedItems.push("vector stores");
+      if (selectedPreset.prompt) appliedItems.push("prompt");
+      
+      toast({
+        title: "Preset applied",
+        description: `${appliedItems.join(" and ")} from "${selectedPreset.name}" have been added to the question plan`,
+        duration: 3500,
+      });
+    }
+  }, [presets]);
 
   const handleFormChange = useCallback((field: keyof CreateQuestionPlanRequest, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -224,6 +276,38 @@ export default function CreateQuestionPlanPage() {
                 onSelect={(subtopicId) => handleFormChange("subTopicId", subtopicId)}
                 subtopics={subtopics}
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="preset">Preset (Optional)</Label>
+              <Select value={selectedPresetId} onValueChange={handlePresetSelect}>
+                <SelectTrigger id="preset">
+                  <SelectValue placeholder="Select a preset to apply vector stores" />
+                </SelectTrigger>
+                <SelectContent>
+                  {presets.map((preset) => (
+                    <SelectItem key={preset.id} value={preset.id}>
+                      {preset.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {formData.vectorStores && formData.vectorStores.length > 0 && (
+                <div className="mt-2 space-y-2">
+                  <p className="text-sm font-medium">Applied Vector Stores:</p>
+                  {formData.vectorStores.map((vs, index) => (
+                    <div key={index} className="p-3 border rounded-lg bg-muted/50">
+                      <p className="text-sm font-medium">{vs.name}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Provider: {vs.vectorStoreProvider} | ID: {vs.vectorStoreId}
+                      </p>
+                      {vs.usage && (
+                        <p className="text-xs text-muted-foreground mt-1">{vs.usage}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">

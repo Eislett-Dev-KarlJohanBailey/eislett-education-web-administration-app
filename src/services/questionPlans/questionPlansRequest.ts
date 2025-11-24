@@ -39,6 +39,7 @@ export interface QuestionPlan {
   locked: boolean;
   active: boolean;
   createdAt: string;
+  vectorStores?: VectorStore[];
 }
 
 interface QuestionPlansResponse {
@@ -50,6 +51,31 @@ interface QuestionPlansResponse {
     total_pages: number;
   };
   error?: string;
+}
+
+export interface VectorStore {
+  vectorStoreId: string;
+  vectorStoreProvider: string;
+  name: string;
+  usage: string;
+}
+
+export interface QuestionPlanPreset {
+  id: string;
+  name: string;
+  vectorStores: VectorStore[];
+  prompt?: string;
+  createdAt: string;
+}
+
+export interface QuestionPlanPresetsResponse {
+  amount: number;
+  data: QuestionPlanPreset[];
+  pagination: {
+    page_size: number;
+    page_number: number;
+    total_pages: number;
+  };
 }
 
 export interface CreateQuestionPlanRequest {
@@ -64,6 +90,7 @@ export interface CreateQuestionPlanRequest {
   active?: boolean;
   created?: Array<{ question: string }>;
   locked?: boolean;
+  vectorStores?: VectorStore[];
 }
 
 export async function handleFetchQuestionPlans(
@@ -297,6 +324,40 @@ export async function handleGenerateQuestions(
       visible: 0,
       error: e.message || "Failed to generate questions" 
     };
+  }
+}
+
+export async function handleFetchQuestionPlanPresets(
+  token: string
+): Promise<{ data?: QuestionPlanPreset[]; error?: string }> {
+  try {
+    const rawResponse = await fetch(
+      `/api/question-plan-presets`,
+      {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    if (!rawResponse.ok) {
+      const errorData = await rawResponse.json().catch(() => ({}));
+      throw new Error(errorData.error || "Failed to fetch question plan presets");
+    }
+
+    const response = (await rawResponse.json()) as QuestionPlanPresetsResponse;
+    return { data: response.data || [] };
+  } catch (e: any) {
+    toast({
+      title: e.message || "Error fetching question plan presets",
+      style: { background: "red", color: "white" },
+      duration: 3500,
+    });
+    console.log("Question plan presets error", e);
+    return { error: e.message || "Failed to fetch question plan presets" };
   }
 }
 
