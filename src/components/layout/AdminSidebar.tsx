@@ -20,7 +20,8 @@ import {
   Map,
   ClipboardList,
   Megaphone,
-  Flag
+  Flag,
+  HandHeart
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/contexts/AuthContext"
@@ -104,6 +105,12 @@ export function AdminSidebar({ isOpen, onOpenChange }: AdminSidebarProps) {
       title: "Advertisements",
       icon: Megaphone,
       href: "/admin/advertisements",
+      resource: null // Always visible (or add a resource if needed)
+    },
+    {
+      title: "Sponsors",
+      icon: HandHeart,
+      href: "/admin/sponsors",
       resource: null // Always visible (or add a resource if needed)
     },
     {

@@ -8,12 +8,12 @@ import { useRouter } from "next/router";
 import { useAuth } from "@/contexts/AuthContext";
 import { DEFAULT_PAGE_NUMBER } from "@/constants/tablePageSizes";
 import { toast } from "@/hooks/use-toast";
-import { handleFetchAdvertisements, handleDeleteAdvertisement } from "@/services/advertisements/advertisementsRequest";
-import { Advertisement } from "@/models/advertisements/advertisement";
+import { handleFetchSponsors, handleDeleteSponsor } from "@/services/sponsors/sponsorsRequest";
+import { Sponsor } from "@/models/sponsors/sponsor";
 import { Badge } from "@/components/ui/badge";
 import { DeleteConfirmationDialog } from "@/components/data/DeleteConfirmationDialog";
 
-export default function AdvertisementsPage() {
+export default function SponsorsPage() {
   const router = useRouter();
   const authContext = useContext(useAuth());
 
@@ -22,17 +22,17 @@ export default function AdvertisementsPage() {
   const pageNumber = isRouterReady && router.query.page ? parseInt(router.query.page as string, 10) : DEFAULT_PAGE_NUMBER;
   const pageSize = isRouterReady && router.query.pageSize ? parseInt(router.query.pageSize as string, 10) : 10;
 
-  const [advertisements, setAdvertisements] = useState<Advertisement[]>([]);
+  const [sponsors, setSponsors] = useState<Sponsor[]>([]);
   const [totalAmount, setTotalAmount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
-  const [adToDelete, setAdToDelete] = useState<string | null>(null);
+  const [sponsorToDelete, setSponsorToDelete] = useState<string | null>(null);
 
-  const fetchAdvertisements = useCallback(async () => {
+  const fetchSponsors = useCallback(async () => {
     if (!authContext?.token) return;
 
     setIsLoading(true);
     try {
-      const response = await handleFetchAdvertisements(
+      const response = await handleFetchSponsors(
         authContext.token,
         pageNumber,
         pageSize
@@ -44,19 +44,19 @@ export default function AdvertisementsPage() {
           style: { background: "red", color: "white" },
           duration: 3500,
         });
-        setAdvertisements([]);
+        setSponsors([]);
         setTotalAmount(0);
       } else {
-        setAdvertisements(response.data ?? []);
+        setSponsors(response.data ?? []);
         setTotalAmount(response.amount ?? 0);
       }
     } catch (error) {
       toast({
-        title: "Error fetching advertisements",
+        title: "Error fetching sponsors",
         style: { background: "red", color: "white" },
         duration: 3500,
       });
-      setAdvertisements([]);
+      setSponsors([]);
       setTotalAmount(0);
     } finally {
       setIsLoading(false);
@@ -65,9 +65,9 @@ export default function AdvertisementsPage() {
 
   useEffect(() => {
     if (router.isReady && authContext?.token) {
-      fetchAdvertisements();
+      fetchSponsors();
     }
-  }, [router.isReady, authContext?.token, pageNumber, pageSize, fetchAdvertisements]);
+  }, [router.isReady, authContext?.token, pageNumber, pageSize, fetchSponsors]);
 
   const handlePageChange = useCallback((page: number) => {
     const query = { ...router.query, page: page.toString() };
@@ -97,74 +97,71 @@ export default function AdvertisementsPage() {
     {
       id: "title",
       header: "Title",
-      cell: (ad: Advertisement) => (
+      cell: (sponsor: Sponsor) => (
         <div className="max-w-md">
-          <p className="text-sm font-medium truncate">{ad.title}</p>
+          <p className="text-sm font-medium truncate">{sponsor.title}</p>
         </div>
       ),
     },
     {
-      id: "type",
-      header: "Type",
-      cell: (ad: Advertisement) => (
-        <Badge variant="outline">{ad.type}</Badge>
-      ),
-    },
-    {
-      id: "placements",
-      header: "Placements",
-      cell: (ad: Advertisement) => (
-        <div className="flex flex-wrap gap-1">
-          {ad.placements.slice(0, 2).map((placement, idx) => (
-            <Badge key={idx} variant="secondary" className="text-xs">
-              {placement.replace("_", " ")}
-            </Badge>
-          ))}
-          {ad.placements.length > 2 && (
-            <Badge variant="secondary" className="text-xs">
-              +{ad.placements.length - 2}
-            </Badge>
-          )}
+      id: "website",
+      header: "Website",
+      cell: (sponsor: Sponsor) => (
+        <div className="max-w-md">
+          <a
+            href={sponsor.websiteUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-blue-600 hover:underline truncate"
+          >
+            {sponsor.websiteUrl}
+          </a>
         </div>
       ),
     },
     {
       id: "active",
       header: "Status",
-      cell: (ad: Advertisement) => (
-        <Badge variant={ad.active ? "default" : "outline"}>
-          {ad.active ? "Active" : "Inactive"}
+      cell: (sponsor: Sponsor) => (
+        <Badge variant={sponsor.active ? "default" : "outline"}>
+          {sponsor.active ? "Active" : "Inactive"}
         </Badge>
       ),
     },
     {
-      id: "stats",
-      header: "Stats",
-      cell: (ad: Advertisement) => (
+      id: "timePeriod",
+      header: "Time Period",
+      cell: (sponsor: Sponsor) => (
         <div className="text-sm text-muted-foreground">
-          <div>Clicks: {ad.clickCount}</div>
-          <div>Impressions: {ad.impressionCount}</div>
+          {sponsor.timePeriod ? (
+            <>
+              <div>Start: {formatDate(sponsor.timePeriod.start)}</div>
+              <div>End: {formatDate(sponsor.timePeriod.end)}</div>
+            </>
+          ) : (
+            "-"
+          )}
         </div>
       ),
     },
     {
       id: "createdAt",
       header: "Created",
-      cell: (ad: Advertisement) => (
+      cell: (sponsor: Sponsor) => (
         <div className="text-sm text-muted-foreground">
-          {ad.createdAt ? formatDate(ad.createdAt) : "-"}
+          {sponsor.createdAt ? formatDate(sponsor.createdAt) : "-"}
         </div>
       ),
     },
     {
       id: "actions",
       header: "Actions",
-      cell: (ad: Advertisement) => (
+      cell: (sponsor: Sponsor) => (
         <div className="flex items-center gap-2">
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => router.push(`/admin/advertisements/edit/${ad.id}`)}
+            onClick={() => router.push(`/admin/sponsors/edit/${sponsor.id}`)}
           >
             <Edit className="h-4 w-4 mr-2" />
             Edit
@@ -172,7 +169,7 @@ export default function AdvertisementsPage() {
           <Button
             variant="destructive"
             size="sm"
-            onClick={() => setAdToDelete(ad.id)}
+            onClick={() => setSponsorToDelete(sponsor.id)}
           >
             <Trash2 className="h-4 w-4 mr-2" />
             Delete
@@ -183,22 +180,22 @@ export default function AdvertisementsPage() {
   ];
 
   const handleCreateClick = useCallback(() => {
-    router.push("/admin/advertisements/create");
+    router.push("/admin/sponsors/create");
   }, [router]);
 
   return (
     <AdminLayout>
       <DataManagementLayout
-        title="Advertisements"
-        description="Manage advertisements and campaigns"
+        title="Sponsors"
+        description="Manage sponsors and partnerships"
         isLoading={isLoading}
-        onRefresh={fetchAdvertisements}
+        onRefresh={fetchSponsors}
         onAddNew={handleCreateClick}
-        addNewLabel="Create Advertisement"
+        addNewLabel="Create Sponsor"
       >
         <div className="space-y-4">
           <DataTable
-            data={advertisements}
+            data={sponsors}
             columns={columns}
             keyExtractor={(item) => item.id}
             pagination={{
@@ -215,51 +212,51 @@ export default function AdvertisementsPage() {
             }}
             emptyState={
               <div className="flex flex-col items-center justify-center py-8">
-                <p className="text-muted-foreground mb-4">No advertisements found</p>
+                <p className="text-muted-foreground mb-4">No sponsors found</p>
               </div>
             }
           />
         </div>
 
         <DeleteConfirmationDialog
-          open={adToDelete !== null}
-          onOpenChange={(open) => !open && setAdToDelete(null)}
+          open={sponsorToDelete !== null}
+          onOpenChange={(open) => !open && setSponsorToDelete(null)}
           onConfirm={async () => {
-            if (!adToDelete || !authContext?.token) {
-              setAdToDelete(null);
+            if (!sponsorToDelete || !authContext?.token) {
+              setSponsorToDelete(null);
               return;
             }
 
             try {
-              const result = await handleDeleteAdvertisement(authContext.token, adToDelete);
+              const result = await handleDeleteSponsor(authContext.token, sponsorToDelete);
               
               if (result.deleted) {
                 toast({
-                  title: "Advertisement deleted successfully",
+                  title: "Sponsor deleted successfully",
                   style: { background: "green", color: "white" },
                   duration: 3500,
                 });
-                await fetchAdvertisements();
+                await fetchSponsors();
               } else {
                 toast({
-                  title: result.error || "Failed to delete advertisement",
+                  title: result.error || "Failed to delete sponsor",
                   style: { background: "red", color: "white" },
                   duration: 3500,
                 });
               }
             } catch (error) {
-              console.error("Error deleting advertisement:", error);
-            toast({
-                title: "Error deleting advertisement",
+              console.error("Error deleting sponsor:", error);
+              toast({
+                title: "Error deleting sponsor",
                 style: { background: "red", color: "white" },
-              duration: 3500,
-            });
+                duration: 3500,
+              });
             } finally {
-            setAdToDelete(null);
+              setSponsorToDelete(null);
             }
           }}
-          title="Delete Advertisement"
-          description="Are you sure you want to delete this advertisement? This action cannot be undone."
+          title="Delete Sponsor"
+          description="Are you sure you want to delete this sponsor? This action cannot be undone."
         />
       </DataManagementLayout>
     </AdminLayout>
