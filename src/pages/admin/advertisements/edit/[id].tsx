@@ -23,6 +23,7 @@ const AD_PLACEMENTS: AdPlacement[] = [
   "section_rhs",
   "quizzes_rhs",
   "sidebar",
+  "redo_quiz_popup",
 ];
 
 const RULE_TYPES: AdvertismentTargetingRule["type"][] = [
