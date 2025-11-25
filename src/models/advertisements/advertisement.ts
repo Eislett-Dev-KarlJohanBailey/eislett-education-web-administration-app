@@ -2,7 +2,8 @@ export type AdPlacement =
   | "strand_rhs"
   | "section_rhs"
   | "quizzes_rhs"
-  | "sidebar";
+  | "sidebar" 
+  | "redo_quiz_popup";
 
 export interface AdvertismentTargetingRule {
   type: "country" | "student" | "teacher" | "percentage" | "cidr" | "school" | "grade" | "user_type";
