@@ -1314,7 +1314,7 @@ export default function UpdateQuestionPage() {
                       type="range"
                       min="0.1"
                       max="1"
-                      step="0.1"
+                      step="0.01"
                       value={formData.difficultyLevel || 0.1}
                       onChange={(e) =>
                         handleInputChange(
@@ -1329,7 +1329,7 @@ export default function UpdateQuestionPage() {
                         type="number"
                         min="0.1"
                         max="1"
-                        step="0.1"
+                        step="0.01"
                         value={formData.difficultyLevel || 0.1}
                         onChange={(e) =>
                           handleInputChange(
@@ -1340,7 +1340,7 @@ export default function UpdateQuestionPage() {
                         className="w-20"
                       />
                       <span className="text-sm font-medium">
-                        {(formData.difficultyLevel * 10).toFixed(1)}/10
+                        {(formData.difficultyLevel * 10).toFixed(2)}/10
                       </span>
                     </div>
                   </div>
