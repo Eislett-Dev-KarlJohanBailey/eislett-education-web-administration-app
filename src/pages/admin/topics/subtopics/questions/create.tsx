@@ -928,10 +928,10 @@ export default function CreateQuestionPage() {
                     <Input
                       id="difficulty"
                       type="range"
-                      min="0.1"
+                      min="0"
                       max="1"
-                      step="0.1"
-                      value={formData.difficultyLevel || 0.1}
+                      step="0.01"
+                      value={formData.difficultyLevel ?? 0}
                       onChange={(e) =>
                         handleInputChange(
                           "difficultyLevel",
@@ -943,20 +943,20 @@ export default function CreateQuestionPage() {
                     <div className="flex items-center space-x-2">
                       <Input
                         type="number"
-                        min="0.1"
+                        min="0"
                         max="1"
-                        step="0.1"
-                        value={formData.difficultyLevel || 0.1}
+                        step="0.01"
+                        value={formData.difficultyLevel ?? 0}
                         onChange={(e) =>
                           handleInputChange(
                             "difficultyLevel",
-                            parseFloat(e.target.value) || 0.1
+                            parseFloat(e.target.value) || 0
                           )
                         }
                         className="w-20"
                       />
                       <span className="text-sm font-medium">
-                        {(formData.difficultyLevel * 10).toFixed(1)}/10
+                        {((formData.difficultyLevel ?? 0) * 10).toFixed(2)}/10
                       </span>
                     </div>
                   </div>
@@ -1406,7 +1406,7 @@ export default function CreateQuestionPage() {
                       <span className="text-sm font-medium text-muted-foreground">
                         Difficulty:
                       </span>
-                      <p>{(formData.difficultyLevel * 10).toFixed(1)}/10</p>
+                      <p>{((formData.difficultyLevel ?? 0) * 10).toFixed(2)}/10</p>
                     </div>
 
                     <div>
