@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState, useContext } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -10,16 +10,20 @@ interface AuthLayoutProps {
 
 export default function AuthLayout({ children }: AuthLayoutProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const auth = useContext(useAuth());
   const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
     if (!auth?.token) {
+      if (!pathname?.includes("/auth/login") && !pathname?.includes("/auth/register")) {
+        localStorage.setItem("redirectUrl", pathname || "/admin");
+      }
       router.push("/auth/login");
       return;
     }
     setIsChecking(false);
-  }, [auth, router]);
+  }, [auth, router, pathname]);
 
   if (isChecking) {
     return (
