@@ -1,5 +1,4 @@
-
-import { useContext, useRef, useState } from "react";
+import { useContext, useRef, useState, useEffect } from "react";
 import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
@@ -27,9 +26,18 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [redirectUrl, setRedirectUrl] = useState("/admin");
 
   const emailRef = useRef(null);
   const passwordRef = useRef(null);
+
+  // Get the redirect URL on component mount
+  useEffect(() => {
+    const savedRedirectUrl = localStorage.getItem("redirectUrl");
+    if (savedRedirectUrl) {
+      setRedirectUrl(savedRedirectUrl);
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -93,8 +101,20 @@ export default function LoginPage() {
           // Continue with login even if user details fetch fails
         }
         
-        toast({ title: 'Redirecting...', style: { background: 'green', color: 'white' }, duration: 1500 })
-        router.push("/admin");
+        // Remove the redirect URL from localStorage
+        localStorage.removeItem("redirectUrl");
+        
+        toast({ 
+          title: 'Login Successful!', 
+          description: 'Redirecting...',
+          style: { background: 'green', color: 'white' }, 
+          duration: 1500 
+        });
+        
+        // Redirect to the saved URL or default to /admin
+        setTimeout(() => {
+          router.push(redirectUrl);
+        }, 1000);
       }
       else if (data?.error)
         toast({ title: data?.error, style: { background: 'red', color: 'white' }, duration: 3500 })
